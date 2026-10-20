@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Tetris × Auditory Categorization Prototype</title>
+  <style>
+    :root { --bg:#101522; --panel:#1a2132; --line:#34405a; --text:#f5f7fb; --muted:#aeb9cc; --accent:#64d8ff; --good:#75e5a5; --bad:#ff8792; }
+    * { box-sizing:border-box; }
+    body { margin:0; min-height:100vh; display:grid; place-items:center; background:var(--bg); color:var(--text); font:16px/1.4 system-ui,sans-serif; }
+    .experiment { width:min(1100px,96vw); display:grid; grid-template-columns:1fr 1fr; gap:24px; padding:24px 0; }
+    .panel { min-height:640px; padding:24px; border:1px solid var(--line); border-radius:16px; background:var(--panel); }
+    h1 { font-size:1.25rem; margin:0 0 8px; } p { color:var(--muted); margin:0 0 18px; }
+    .status { display:flex; justify-content:space-between; padding:12px; margin-bottom:16px; border-radius:9px; background:#111827; }
+    .listen { min-height:245px; display:grid; place-items:center; margin:18px 0; border:1px dashed #53627f; border-radius:12px; background:#111827; text-align:center; }
+    .ear { font-size:4.4rem; line-height:1; }.listen b { display:block; margin-top:14px; font-size:1.15rem; }.listen span { color:var(--muted); font-size:.9rem; }
+    .response { text-align:center; font-weight:700; font-size:1.05rem; }.keys { display:flex; justify-content:center; gap:18px; margin:16px 0 22px; }
+    kbd { min-width:42px; padding:6px 10px; border:1px solid #6c7890; border-bottom-width:3px; border-radius:6px; background:#111827; color:#fff; font-weight:700; }
+    #feedback { min-height:24px; text-align:center; font-weight:700; color:var(--good); }
+    button { cursor:pointer; border:0; border-radius:8px; padding:11px 16px; background:var(--accent); color:#07121b; font-weight:800; font-size:1rem; }
+    .log { max-height:112px; overflow:auto; margin-top:18px; font:12px/1.3 ui-monospace,monospace; color:var(--muted); }
+    .game { display:flex; justify-content:center; align-items:flex-start; gap:16px; }.side { min-width:128px; }.score { font-size:1.5rem; font-weight:800; color:var(--accent); }
+    canvas { display:block; border:2px solid #60708f; background:#0d1320; image-rendering:pixelated; }.next { margin-top:8px; }
+    @media (max-width:760px) { .experiment { grid-template-columns:1fr; }.panel { min-height:auto; } }
+  </style>
+</head>
+<body>
+  <main class="experiment">
+    <section class="panel" aria-label="Auditory categorical perception task">
+      <h1>Auditory Categorization</h1>
+      <p>Hear a syllable-like sound and categorize it while continuing to play Tetris.</p>
+      <div class="status"><span>Trial <b id="trial">0</b></span><span>Accuracy <b id="accuracy">—</b></span></div>
+      <div class="listen"><div><div class="ear">◖</div><b id="soundStatus">Ready to listen</b><span id="soundHint">The sound is played through your device.</span></div></div>
+      <div class="response"><kbd>F</kbd> &nbsp; /ba/ &nbsp;&nbsp;&nbsp; <kbd>J</kbd> &nbsp; /pa/</div>
+      <div class="keys"><button id="startAudio">Start auditory task</button></div>
+      <div id="feedback" aria-live="polite">Use headphones if available. Press Start, then respond with F or J.</div>
+      <div class="log" id="audioLog"></div>
+    </section>
+
+    <section class="panel" aria-label="Tetris task">
+      <h1>Tetris</h1>
+      <p>Arrow keys: move/rotate &nbsp; • &nbsp; Space: hard drop</p>
+      <div class="game"><canvas id="tetris" width="300" height="600" aria-label="Tetris board"></canvas><div class="side"><div>Score</div><div class="score" id="score">0</div><div class="next">Next</div><canvas id="next" width="120" height="120"></canvas><br><button id="startGame">Start game</button></div></div>
+    </section>
+  </main>
+
+<script>
+// Prototype only: use validated recorded /ba/ and /pa/ stimuli, consent, counterbalancing, timing controls, and CSV export in a study.
+const boardCanvas=document.querySelector('#tetris'),ctx=boardCanvas.getContext('2d');
+const nextCanvas=document.querySelector('#next'),nextCtx=nextCanvas.getContext('2d');
+const COLS=10,ROWS=20,SIZE=30;
+const colors=['#000','#41d9ff','#ffe05b','#b27cff','#7ddd7a','#ff7884','#ffb75d','#558cff'];
+const pieces=[[],[[1,1,1,1]],[[2,0,0],[2,2,2]],[[0,0,3],[3,3,3]],[[4,4],[4,4]],[[0,5,5],[5,5,0]],[[6,6,0],[0,6,6]],[[7,7,7],[0,7,0]]];
+let board,piece,nextPiece,score,running=false,dropAt=0;
+const clone=x=>x.map(r=>[...r]),randomPiece=()=>clone(pieces[1+Math.floor(Math.random()*7)]);
+function resetGame(){board=Array.from({length:ROWS},()=>Array(COLS).fill(0));score=0;piece={m:randomPiece(),x:3,y:0};nextPiece=randomPiece();scoreEl.textContent=score;draw();}
+function collide(p=piece){return p.m.some((row,y)=>row.some((v,x)=>v&&(p.x+x<0||p.x+x>=COLS||p.y+y>=ROWS||(p.y+y>=0&&board[p.y+y][p.x+x]))));}
+function merge(){piece.m.forEach((row,y)=>row.forEach((v,x)=>{if(v&&piece.y+y>=0)board[piece.y+y][piece.x+x]=v;}));}
+function clearLines(){let n=0;for(let y=ROWS-1;y>=0;y--)if(board[y].every(Boolean)){board.splice(y,1);board.unshift(Array(COLS).fill(0));n++;y++;}score+=[0,100,300,500,800][n];scoreEl.textContent=score;}
+function spawn(){piece={m:nextPiece,x:3,y:0};nextPiece=randomPiece();if(collide()){running=false;startGame.textContent='Game over — restart';}}
+function rotate(){const old=piece.m;piece.m=old[0].map((_,i)=>old.map(r=>r[i]).reverse());if(collide())piece.m=old;}
+function drawBlock(c,x,y,v){c.fillStyle=colors[v];c.fillRect(x*SIZE+1,y*SIZE+1,SIZE-2,SIZE-2);}
+function draw(){ctx.clearRect(0,0,300,600);board.forEach((r,y)=>r.forEach((v,x)=>v&&drawBlock(ctx,x,y,v)));piece.m.forEach((r,y)=>r.forEach((v,x)=>v&&drawBlock(ctx,piece.x+x,piece.y+y,v)));nextCtx.clearRect(0,0,120,120);nextPiece.forEach((r,y)=>r.forEach((v,x)=>{if(v){nextCtx.fillStyle=colors[v];nextCtx.fillRect(x*24+18,y*24+18,22,22);}}));}
+function loop(t){if(running&&t-dropAt>700){piece.y++;if(collide()){piece.y--;merge();clearLines();spawn();}dropAt=t;draw();}requestAnimationFrame(loop);}requestAnimationFrame(loop);
+startGame.onclick=()=>{resetGame();running=true;dropAt=performance.now();startGame.textContent='Restart game';};
+
+// Synthetic voiced-stop approximation: short vs. long voice-onset timing distinguishes /ba/-like and /pa/-like sounds.
+let audioContext, audioTrial=null, audioTimer=null, total=0, correct=0;
+function playSyllable(category){
+  // Avoid newer syntax here so the prototype also runs in older browser versions.
+  if(!audioContext){
+    const AudioCtx=window.AudioContext||window.webkitAudioContext;
+    if(!AudioCtx){ feedback.textContent='This browser does not support Web Audio. Try a current version of Chrome, Edge, Firefox, or Safari.'; return; }
+    audioContext=new AudioCtx();
+  }
+  if(audioContext.state==='suspended') audioContext.resume();
+  const t=audioContext.currentTime+.05, voiced=category==='ba'?0.025:0.105;
+  const noise=audioContext.createBufferSource(), noiseBuffer=audioContext.createBuffer(1,Math.floor(audioContext.sampleRate*.025),audioContext.sampleRate), data=noiseBuffer.getChannelData(0);
+  for(let i=0;i<data.length;i++)data[i]=Math.random()*2-1;
+  noise.buffer=noiseBuffer; const noiseGain=audioContext.createGain(), filter=audioContext.createBiquadFilter();filter.type='bandpass';filter.frequency.value=1400;filter.Q.value=.8;noiseGain.gain.setValueAtTime(.12,t);noiseGain.gain.exponentialRampToValueAtTime(.001,t+.025);noise.connect(filter).connect(noiseGain).connect(audioContext.destination);noise.start(t);
+  const osc=audioContext.createOscillator(), gain=audioContext.createGain();osc.type='sawtooth';osc.frequency.setValueAtTime(130,t+voiced);gain.gain.setValueAtTime(.001,t+voiced);gain.gain.exponentialRampToValueAtTime(.12,t+voiced+.02);gain.gain.exponentialRampToValueAtTime(.001,t+.30);osc.connect(gain).connect(audioContext.destination);osc.start(t+voiced);osc.stop(t+.32);
+}
+function newAudioTrial(){const category=Math.random()<.5?'ba':'pa';audioTrial={category,start:performance.now()};soundStatus.textContent='Listen…';soundHint.textContent='Respond: F = /ba/, J = /pa/';playSyllable(category);setTimeout(()=>{if(audioTrial){soundStatus.textContent='Your response?';feedback.textContent='F = /ba/     J = /pa/';}},350);audioTimer=setTimeout(()=>{if(audioTrial)answerAudio(null);},2200);}
+function answerAudio(response){if(!audioTrial)return;clearTimeout(audioTimer);const current=audioTrial,ok=response===current.category;total++;correct+=ok;trial.textContent=total;accuracy.textContent=Math.round(correct/total*100)+'%';const rt=response?Math.round(performance.now()-current.start):null;feedback.style.color=ok?'var(--good)':'var(--bad)';feedback.textContent=response?(ok?'Correct':'Incorrect')+` — ${rt} ms. Next sound in 1800 ms.`:'No response. Next sound in 1800 ms.';audioLog.innerHTML=`Trial ${total}: /${current.category}/ | ${response?'/'+response+'/':'miss'} | ${ok?'correct':'incorrect'} | ${rt??'—'} ms<br>`+audioLog.innerHTML;audioTrial=null;soundStatus.textContent='Waiting for next sound…';audioTimer=setTimeout(newAudioTrial,1800);}
+startAudio.onclick=()=>{if(audioTrial||audioTimer)return;startAudio.textContent='Auditory task running';startAudio.disabled=true;newAudioTrial();};
+
+document.addEventListener('keydown',e=>{if(['ArrowLeft','ArrowRight','ArrowUp','ArrowDown',' '].includes(e.key))e.preventDefault();if(e.key==='f'||e.key==='F')answerAudio('ba');if(e.key==='j'||e.key==='J')answerAudio('pa');if(!running)return;if(e.key==='ArrowLeft'){piece.x--;if(collide())piece.x++;}if(e.key==='ArrowRight'){piece.x++;if(collide())piece.x--;}if(e.key==='ArrowUp')rotate();if(e.key==='ArrowDown'){piece.y++;if(collide())piece.y--;}if(e.key===' '){while(!collide())piece.y++;piece.y--;merge();clearLines();spawn();}draw();});
+const scoreEl=document.querySelector('#score'),startGame=document.querySelector('#startGame'),startAudio=document.querySelector('#startAudio'),trial=document.querySelector('#trial'),accuracy=document.querySelector('#accuracy'),feedback=document.querySelector('#feedback'),audioLog=document.querySelector('#audioLog'),soundStatus=document.querySelector('#soundStatus'),soundHint=document.querySelector('#soundHint');
+resetGame();
+</script>
+</body>
+</html>
