@@ -1,0 +1,198 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Tetris × Auditory Discrimination Prototype</title>
+  <style>
+    :root { --bg:#101522; --panel:#1a2132; --line:#34405a; --text:#f5f7fb; --muted:#aeb9cc; --accent:#64d8ff; --good:#75e5a5; --bad:#ff8792; }
+    * { box-sizing:border-box; }
+    body { margin:0; min-height:100vh; display:grid; place-items:center; background:var(--bg); color:var(--text); font:16px/1.4 system-ui,sans-serif; }
+    .experiment { width:min(1100px,96vw); display:grid; grid-template-columns:1fr 1fr; gap:24px; padding:24px 0; }
+    .panel { min-height:640px; padding:24px; border:1px solid var(--line); border-radius:16px; background:var(--panel); }
+    h1 { font-size:1.25rem; margin:0 0 8px; } p { color:var(--muted); margin:0 0 18px; }
+    .status { display:flex; justify-content:space-between; padding:12px; margin-bottom:16px; border-radius:9px; background:#111827; }
+    .listen { min-height:245px; display:grid; place-items:center; margin:18px 0; border:1px dashed #53627f; border-radius:12px; background:#111827; text-align:center; }
+    .ear { font-size:4.4rem; line-height:1; }.listen b { display:block; margin-top:14px; font-size:1.15rem; }.listen span { color:var(--muted); font-size:.9rem; }
+    .response { text-align:center; font-weight:700; font-size:1.05rem; }.keys { display:flex; justify-content:center; gap:18px; margin:16px 0 22px; }
+    .response { margin-bottom:18px; }
+    kbd { min-width:42px; padding:6px 10px; border:1px solid #6c7890; border-bottom-width:3px; border-radius:6px; background:#111827; color:#fff; font-weight:700; }
+    #feedback { min-height:24px; text-align:center; font-weight:700; color:var(--good); }
+    button { cursor:pointer; border:0; border-radius:8px; padding:11px 16px; background:var(--accent); color:#07121b; font-weight:800; font-size:1rem; }
+    .log { max-height:112px; overflow:auto; margin-top:18px; font:12px/1.3 ui-monospace,monospace; color:var(--muted); }
+    .game { display:flex; justify-content:center; align-items:flex-start; gap:16px; }.side { min-width:128px; }.score { font-size:1.5rem; font-weight:800; color:var(--accent); }
+    canvas { display:block; border:2px solid #60708f; background:#0d1320; image-rendering:pixelated; }.next { margin-top:8px; }
+    @media (max-width:760px) { .experiment { grid-template-columns:1fr; }.panel { min-height:auto; } }
+  .side input{width:100%;margin:14px 0 8px;padding:8px;border:1px solid #34405a;border-radius:8px;background:#111827;color:#f5f7fb;font:inherit}.side button{width:100%;margin-top:8px}
+</style>
+</head>
+<body>
+  <main class="experiment">
+    <section class="panel" aria-label="Auditory discrimination task">
+      <h1>Auditory Discrimination</h1>
+      <p>Hear two syllables and judge whether they are the same or different while continuing to play Tetris.</p>
+      <div class="status"><span>Trial <b id="trial">0</b></span><span>Accuracy <b id="accuracy">—</b></span></div>
+      <div class="listen"><div><div class="ear">◖</div><b id="soundStatus">Ready to listen</b><span id="soundHint">The sound is played through your device.</span></div></div>
+      <div class="response"><kbd>S</kbd> &nbsp; same &nbsp;&nbsp;&nbsp; <kbd>D</kbd> &nbsp; different</div>
+      <div id="feedback" aria-live="polite">Use headphones if available. Enter a participant ID, then press Start game to begin both tasks.</div>
+      <div class="log" id="audioLog"></div>
+    </section>
+
+    <section class="panel" aria-label="Tetris task">
+      <h1>Tetris</h1>
+      <p>Arrow keys: move/rotate &nbsp; • &nbsp; Space: hard drop</p>
+      <div class="game"><canvas id="tetris" width="300" height="600" aria-label="Tetris board"></canvas><div class="side"><div>Score</div><div class="score" id="score">0</div><div class="next">Next</div><canvas id="next" width="120" height="120"></canvas><input id="pid" placeholder="Participant ID" autocomplete="off"><button id="startGame">Start game</button><button id="downloadData">Download CSV</button></div></div>
+    </section>
+  </main>
+
+<script>
+const TASK_NAME='auditory_discrimination',CSV_COLUMNS=['participant','task','session_start','row_type','trial','step_a','step_b','correct_answer','response','correct','rt_ms','t_ms','tetris_score','tetris_lines','tetris_pieces','tetris_game_overs','secondary_trials','secondary_accuracy_pct'];
+// ---- Data export: one CSV per session (one row per secondary-task trial + a summary row) ----
+let dataRows=[],sessionStart=null,sessionStartPerf=0,tetrisStats={lines:0,pieces:0,gameOvers:0};
+function csvCell(v){if(v===null||v===undefined)return '';v=String(v);return /[",\r\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v;}
+function participantId(){return (document.querySelector('#pid').value||'').trim()||'anon';}
+function stamp(d){const p=n=>String(n).padStart(2,'0');return d.getFullYear()+p(d.getMonth()+1)+p(d.getDate())+'-'+p(d.getHours())+p(d.getMinutes())+p(d.getSeconds());}
+function baseRow(type){return {participant:participantId(),task:TASK_NAME,session_start:sessionStart.toISOString(),row_type:type,t_ms:Math.round(performance.now()-sessionStartPerf),tetris_score:score,tetris_lines:tetrisStats.lines,tetris_pieces:tetrisStats.pieces,tetris_game_overs:tetrisStats.gameOvers};}
+function recordRow(fields){if(sessionStart)dataRows.push(Object.assign(baseRow('trial'),fields));}
+function beginSession(){dataRows=[];sessionStart=new Date();sessionStartPerf=performance.now();tetrisStats={lines:0,pieces:0,gameOvers:0};}
+function downloadCSV(){
+  if(!sessionStart)return;
+  const summary=Object.assign(baseRow('session_summary'),{secondary_trials:total,secondary_accuracy_pct:total?Math.round(correct/total*1000)/10:''});
+  const csv=[CSV_COLUMNS.join(',')].concat(dataRows.concat([summary]).map(r=>CSV_COLUMNS.map(c=>csvCell(r[c])).join(','))).join('\r\n');
+  const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));
+  a.download=TASK_NAME+'_'+participantId().replace(/[^\w-]/g,'_')+'_'+stamp(sessionStart)+'.csv';
+  document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),2000);
+}
+
+// Prototype only: use validated recorded /ba/–/ga/ continuum stimuli, consent, counterbalancing, timing controls, and CSV export in a study.
+const boardCanvas=document.querySelector('#tetris'),ctx=boardCanvas.getContext('2d');
+const nextCanvas=document.querySelector('#next'),nextCtx=nextCanvas.getContext('2d');
+const scoreEl=document.querySelector('#score'),startGame=document.querySelector('#startGame'),trial=document.querySelector('#trial'),accuracy=document.querySelector('#accuracy'),feedback=document.querySelector('#feedback'),audioLog=document.querySelector('#audioLog'),soundStatus=document.querySelector('#soundStatus'),soundHint=document.querySelector('#soundHint');
+const COLS=10,ROWS=20,SIZE=30;
+const colors=['#000','#41d9ff','#ffe05b','#b27cff','#7ddd7a','#ff7884','#ffb75d','#558cff'];
+const pieces=[[],[[1,1,1,1]],[[2,0,0],[2,2,2]],[[0,0,3],[3,3,3]],[[4,4],[4,4]],[[0,5,5],[5,5,0]],[[6,6,0],[0,6,6]],[[7,7,7],[0,7,0]]];
+let board,piece,nextPiece,score,running=false,dropAt=0;
+const clone=x=>x.map(r=>[...r]),randomPiece=()=>clone(pieces[1+Math.floor(Math.random()*7)]);
+function resetGame(){board=Array.from({length:ROWS},()=>Array(COLS).fill(0));score=0;piece={m:randomPiece(),x:3,y:0};nextPiece=randomPiece();scoreEl.textContent=score;draw();}
+function collide(p=piece){return p.m.some((row,y)=>row.some((v,x)=>v&&(p.x+x<0||p.x+x>=COLS||p.y+y>=ROWS||(p.y+y>=0&&board[p.y+y][p.x+x]))));}
+function merge(){tetrisStats.pieces++;piece.m.forEach((row,y)=>row.forEach((v,x)=>{if(v&&piece.y+y>=0)board[piece.y+y][piece.x+x]=v;}));}
+function clearLines(){let n=0;for(let y=ROWS-1;y>=0;y--)if(board[y].every(Boolean)){board.splice(y,1);board.unshift(Array(COLS).fill(0));n++;y++;}tetrisStats.lines+=n;score+=[0,100,300,500,800][n];scoreEl.textContent=score;}
+function spawn(){piece={m:nextPiece,x:3,y:0};nextPiece=randomPiece();if(collide()){running=false;tetrisStats.gameOvers++;startGame.textContent='Game over — restart';}}
+function rotate(){const old=piece.m;piece.m=old[0].map((_,i)=>old.map(r=>r[i]).reverse());if(collide())piece.m=old;}
+function drawBlock(c,x,y,v){c.fillStyle=colors[v];c.fillRect(x*SIZE+1,y*SIZE+1,SIZE-2,SIZE-2);}
+function draw(){ctx.clearRect(0,0,300,600);board.forEach((r,y)=>r.forEach((v,x)=>v&&drawBlock(ctx,x,y,v)));piece.m.forEach((r,y)=>r.forEach((v,x)=>v&&drawBlock(ctx,piece.x+x,piece.y+y,v)));nextCtx.clearRect(0,0,120,120);nextPiece.forEach((r,y)=>r.forEach((v,x)=>{if(v){nextCtx.fillStyle=colors[v];nextCtx.fillRect(x*24+18,y*24+18,22,22);}}));}
+function loop(t){if(running&&t-dropAt>700){piece.y++;if(collide()){piece.y--;merge();clearLines();spawn();}dropAt=t;draw();}requestAnimationFrame(loop);}requestAnimationFrame(loop);
+startGame.onclick=()=>{startGame.blur();if(!sessionStart)beginSession();resetGame();running=true;dropAt=performance.now();startGame.textContent='Restart game';startAuditory();};
+
+let audioContext, audioTrial=null, audioTimer=null, total=0, correct=0;
+// AX discrimination on a 7-step /ba/–/ga/ continuum (step 1 = clear /ba/, step 7 = clear /ga/).
+// Each trial plays two syllables; participant judges same vs. different.
+// "Different" pairs are STEP_DIFF steps apart (2-step pairs are the standard categorical perception design).
+// Lower STEP_DIFF (1) = harder; higher (3) = easier.
+const STEPS=7, STEP_DIFF=2, ISI=0.4, RESPONSE_WINDOW=5000; // ISI = silence between the two syllables (s); window in ms
+// Klatt-style cascade formant synthesizer. Each continuum step is rendered once into an AudioBuffer:
+// Rosenberg glottal pulses with natural jitter/shimmer and breathiness, a falling intonation contour,
+// five cascade formant resonators, and a place-specific release burst.
+// Tokens use a fixed random seed, so "same" pairs are acoustically identical and each step always sounds the same.
+const tokenCache={};
+function ensureAudio(){
+  if(!audioContext){
+    const AudioCtx=window.AudioContext||window.webkitAudioContext;
+    if(!AudioCtx){ feedback.textContent='This browser does not support Web Audio. Try a current version of Chrome, Edge, Firefox, or Safari.'; return false; }
+    audioContext=new AudioCtx();
+  }
+  if(audioContext.state==='suspended') audioContext.resume();
+  for(let s=1;s<=STEPS;s++) if(!tokenCache[s]) tokenCache[s]=synthToken(s);
+  return true;
+}
+function seededRandom(seed){ return function(){ seed=seed+0x6D2B79F5|0; let t=Math.imul(seed^seed>>>15,1|seed); t=t+Math.imul(t^t>>>7,61|t)^t; return ((t^t>>>14)>>>0)/4294967296; }; }
+function synthToken(step){
+  const sr=audioContext.sampleRate, p=(step-1)/(STEPS-1), rand=seededRandom(20261020);
+  const gauss=function(){ let u=0; while(!u)u=rand(); return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*rand()); };
+  const vot=0.010+0.010*p, dur=vot+0.30, N=Math.floor(sr*dur);
+  // Formants for /a/ (adult male): [onset Hz, target Hz, bandwidth Hz]. /ba/ = low F2 onset; /ga/ = high F2 onset close to F3 ("velar pinch").
+  const F=[[250,750,70],[900+p*850,1220,90],[2100-p*100,2600,140],[3400,3400,250],[4200,4200,300]];
+  const trans=0.040+0.015*p;                       // velar transitions are a bit slower
+  const f0At=function(tv){ return tv<0.06?118+10*tv/0.06:128-32*(tv-0.06)/(dur-vot-0.06); };
+  const voiced=new Float32Array(N), y1=[0,0,0,0,0], y2=[0,0,0,0,0];
+  let periodStart=vot, T0=1/f0At(0), amp=1, gPrev=0;
+  for(let n=0;n<N;n++){
+    const t=n/sr; let e=0;
+    if(t>=vot){
+      while(t>=periodStart+T0){ periodStart+=T0; T0=(1/f0At(t-vot))*(1+0.008*gauss()); amp=1+0.04*gauss(); }
+      const tau=t-periodStart, Tp=0.40*T0, Tn=0.16*T0;
+      const g=amp*(tau<Tp?0.5*(1-Math.cos(Math.PI*tau/Tp)):(tau<Tp+Tn?Math.cos(Math.PI*(tau-Tp)/(2*Tn)):0));
+      const dg=(g-gPrev)*Tp*sr; gPrev=g;
+      const tv=t-vot, fallStart=dur-0.07;
+      const env=Math.min(1,tv/0.012)*(t>fallStart?0.5*(1+Math.cos(Math.PI*(t-fallStart)/0.07)):1);
+      e=(dg+(tau<Tp+Tn?0.08:0.025)*gauss())*env;
+    }
+    const x=Math.min(1,t/trans), w=1-(1-x)*(1-x);
+    for(let k=0;k<5;k++){
+      const f=F[k][0]+(F[k][1]-F[k][0])*w, r=Math.exp(-Math.PI*F[k][2]/sr), C=-r*r, B=2*r*Math.cos(2*Math.PI*f/sr);
+      const y=(1-B-C)*e+B*y1[k]+C*y2[k]; y2[k]=y1[k]; y1[k]=y; e=y;
+    }
+    voiced[n]=e;
+  }
+  let peak=0; for(let n=0;n<N;n++) peak=Math.max(peak,Math.abs(voiced[n]));
+  // Release burst: diffuse low-frequency for lips, compact ~1.9 kHz peak for velar; cross-faded along the continuum.
+  const bl=Math.floor(sr*(0.008+0.010*p)), lab=new Float32Array(bl), vel=new Float32Array(bl);
+  const a=1-Math.exp(-2*Math.PI*1200/sr), rv=Math.exp(-Math.PI*400/sr), Cv=-rv*rv, Bv=2*rv*Math.cos(2*Math.PI*1900/sr);
+  let lp=0, v1=0, v2=0, pl=1e-9, pv=1e-9;
+  for(let n=0;n<bl;n++){
+    const nz=rand()*2-1, eb=Math.exp(-n/(bl/3));
+    lp+=a*(nz-lp); const v=(1-Bv-Cv)*nz+Bv*v1+Cv*v2; v2=v1; v1=v;
+    lab[n]=lp*eb; vel[n]=v*eb; pl=Math.max(pl,Math.abs(lab[n])); pv=Math.max(pv,Math.abs(vel[n]));
+  }
+  const buf=audioContext.createBuffer(1,N,sr), out=buf.getChannelData(0);
+  let hpX=0, hpY=0; const hp=Math.exp(-2*Math.PI*60/sr);
+  for(let n=0;n<N;n++){
+    let s=0.6*voiced[n]/peak;
+    if(n<bl) s+=(1-p)*0.15*lab[n]/pl+p*0.35*vel[n]/pv;
+    const y=hp*(hpY+s-hpX); hpX=s; hpY=y;           // remove DC / rumble
+    out[n]=y*(n>N-sr*0.005?(N-n)/(sr*0.005):1);
+  }
+  return buf;
+}
+function playSyllable(step,t){
+  const src=audioContext.createBufferSource(), g=audioContext.createGain();
+  src.buffer=tokenCache[step]; g.gain.value=0.9;
+  src.connect(g); g.connect(audioContext.destination); src.start(t);
+}
+function newAudioTrial(){
+  if(!ensureAudio()) return;
+  const same=Math.random()<.5, a=1+Math.floor(Math.random()*STEPS);
+  let b=a;
+  if(!same){ const opts=[]; if(a+STEP_DIFF<=STEPS)opts.push(a+STEP_DIFF); if(a-STEP_DIFF>=1)opts.push(a-STEP_DIFF); b=opts[Math.floor(Math.random()*opts.length)]; }
+  const now=audioContext.currentTime, t1=now+.05, t2=t1+tokenCache[a].duration+ISI;
+  playSyllable(a,t1); playSyllable(b,t2);
+  const msToSecond=(t2-now)*1000;
+  // RT is measured from the onset of the second syllable (approximate alignment of audio and page clocks).
+  audioTrial={a:a,b:b,answer:same?'same':'different',start:performance.now()+msToSecond};
+  soundStatus.textContent='Listen…'; soundHint.textContent='Respond: S = same, D = different';
+  setTimeout(function(){ if(audioTrial){ soundStatus.textContent='Same or different?'; feedback.style.color='var(--good)'; feedback.textContent='S = same     D = different'; } },msToSecond+300);
+  audioTimer=setTimeout(function(){ if(audioTrial)answerAudio(null); },msToSecond+RESPONSE_WINDOW);
+}
+function answerAudio(response){
+  if(!audioTrial) return;
+  if(response&&performance.now()<audioTrial.start) return; // ignore presses before the second syllable
+  clearTimeout(audioTimer);
+  const current=audioTrial, ok=response===current.answer;
+  total++; correct+=ok; trial.textContent=total; accuracy.textContent=Math.round(correct/total*100)+'%';
+  const rt=response?Math.round(performance.now()-current.start):null;
+  recordRow({trial:total,step_a:current.a,step_b:current.b,correct_answer:current.answer,response:response||'none',correct:ok?1:0,rt_ms:rt});
+  feedback.style.color=ok?'var(--good)':'var(--bad)';
+  feedback.textContent=response?(ok?'Correct':'Incorrect')+' — '+rt+' ms. Next pair in 1800 ms.':'No response. Next pair in 1800 ms.';
+  audioLog.innerHTML='Trial '+total+': steps '+current.a+'–'+current.b+' ('+current.answer+') | '+(response||'miss')+' | '+(ok?'correct':'incorrect')+' | '+(rt===null?'—':rt)+' ms<br>'+audioLog.innerHTML;
+  audioTrial=null; soundStatus.textContent='Waiting for next pair…';
+  audioTimer=setTimeout(newAudioTrial,1800);
+}
+function startAuditory(){if(audioTrial||audioTimer)return;newAudioTrial();}
+
+document.addEventListener('keydown',e=>{if(e.target.tagName==='INPUT')return;if(['ArrowLeft','ArrowRight','ArrowUp','ArrowDown',' '].includes(e.key))e.preventDefault();if(e.key==='s'||e.key==='S')answerAudio('same');if(e.key==='d'||e.key==='D')answerAudio('different');if(!running)return;if(e.key==='ArrowLeft'){piece.x--;if(collide())piece.x++;}if(e.key==='ArrowRight'){piece.x++;if(collide())piece.x--;}if(e.key==='ArrowUp')rotate();if(e.key==='ArrowDown'){piece.y++;if(collide())piece.y--;}if(e.key===' '){while(!collide())piece.y++;piece.y--;merge();clearLines();spawn();}draw();});
+resetGame();
+
+document.querySelector('#downloadData').onclick=function(){downloadCSV();this.blur();};
+</script>
+</body>
+</html>
