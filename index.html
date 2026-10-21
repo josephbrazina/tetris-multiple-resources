@@ -96,11 +96,24 @@ const CSV_COLUMNS=['participant','experiment_start','order','block_n','block','p
   'piece_n','piece_type','first_action_ms','placement_ms','lock_ms','moves','rotations','soft_drops','hard_drop','lines_cleared','holes_created','holes_total','stack_height','score',
   'tetris_lines_total','tetris_pieces_total','tetris_game_overs',
   'calib_window_s','calib_max_stack','calib_holes_per_piece','calib_game_over','calib_action',
-  'duration_s','lines_per_min','holes_per_piece','mean_stack_height','mean_placement_ms','hard_drop_pct','secondary_trials','secondary_accuracy_pct','secondary_misses','secondary_mean_rt_correct_ms','criterion_met','ended',
+  'duration_s','lines_per_min','holes_per_piece','mean_stack_height','mean_placement_ms','hard_drop_pct','secondary_trials','trials_planned','soa_ms','secondary_accuracy_pct','secondary_misses','secondary_mean_rt_correct_ms','criterion_met','ended',
   'comparison','measure','single_value','dual_value','difference','decrement_pct'];
 
 let cfg=null,plan=[],planIdx=-1,block=null,allRows=[],experimentStart=null,finished=false,blockCounter=0;
 let T,sec,CAL=null;
+// ---------- Fixed pacing (main blocks) ----------
+// Each trial gets a fixed time slot (SOA). Trial k starts at block start + k × SOA, whatever the participant does,
+// so every participant gets the same number of trials and the same mix of trial types.
+let pacedTimer=null;
+function runPaced(soaMs,n,startTrial){
+  let k=0;
+  const tick=()=>{if(!block||k>=n)return;const idx=k++;startTrial(idx);
+    if(k<n){const due=block.startPerf+k*soaMs;pacedTimer=setTimeout(tick,Math.max(0,due-performance.now()));}};
+  tick();
+}
+function stopPaced(){clearTimeout(pacedTimer);pacedTimer=null;}
+// Balanced list of n items: whole repetitions of the item set, plus (if n is not a multiple) a random subset; then shuffled.
+function balancedList(items,n){let out=[];while(out.length+items.length<=n)out=out.concat(items);out=out.concat(shuffle(items).slice(0,n-out.length));return shuffle(out);}
 const shuffle=a=>{a=a.slice();for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a;};
 const fmtTime=ms=>{const s=Math.ceil(Math.max(0,ms)/1000);return Math.floor(s/60)+':'+String(s%60).padStart(2,'0');};
 
@@ -276,11 +289,13 @@ function viewIsClear(cells,M){
 }
 let rotationTrial=null,rotationTimeout=null,nextTrialTimeout=null;
 function blankObjects(){[reference,comparison].forEach(c=>{const g=c.getContext('2d');g.fillStyle='#111827';g.fillRect(0,0,c.width,c.height);});}
-function pickRotationTrial(practice){
+// spec (main blocks) fixes shape, angle and answer; base orientation and direction are sampled until both views are clear.
+function pickRotationTrial(practice,spec){
   const angles=practice?ANGLES_PRACTICE:ANGLES_MAIN;let t=null;
-  for(let tries=0;tries<400;tries++){
-    const si=Math.floor(Math.random()*shapes.length),same=Math.random()<.5,base=CUBE_ROTS[Math.floor(Math.random()*CUBE_ROTS.length)];
-    const angle=angles[Math.floor(Math.random()*angles.length)],sign=Math.random()<.5?1:-1;
+  for(let tries=0;tries<600;tries++){
+    const si=spec?spec.si:Math.floor(Math.random()*shapes.length),same=spec?spec.same:Math.random()<.5;
+    const angle=spec?spec.angle:angles[Math.floor(Math.random()*angles.length)];
+    const base=CUBE_ROTS[Math.floor(Math.random()*CUBE_ROTS.length)],sign=Math.random()<.5?1:-1;
     const shape=shapes[si],cmpShape=same?shape:shape.map(([x,y,z])=>[-x,y,z]);
     const Mref=mul(VIEW,base),Mcmp=mul(rotY(rad(sign*angle)),Mref);
     t={si:si,same:same,angle:angle,shape:shape,cmpShape:cmpShape,Mref:Mref,Mcmp:Mcmp};
@@ -288,14 +303,24 @@ function pickRotationTrial(practice){
   }
   return t;
 }
-function newRotationTrial(){
+// Main-block trial list: every angle × answer combination equally often, every shape equally often.
+function mrSoaMs(){return cfg.mrWindow;}
+function mrTrialsPerBlock(){return Math.floor(cfg.blockMs/mrSoaMs());}
+function buildRotationList(n){
+  const cells=[];ANGLES_MAIN.forEach(a=>[true,false].forEach(sm=>cells.push({angle:a,same:sm})));
+  const c=balancedList(cells,n),sh=balancedList(shapes.map((_,i)=>i),n);
+  return c.map((x,i)=>({angle:x.angle,same:x.same,si:sh[i]}));
+}
+function showRotationTrial(spec){
   if(!block)return;
-  const t=pickRotationTrial(block.practice);
+  if(rotationTrial)answerRotation(null); // previous slot ended without a response
+  const t=pickRotationTrial(block.practice,spec);
   renderObject(reference,t.shape,t.Mref);renderObject(comparison,t.cmpShape,t.Mcmp);
   rotationTrial={same:t.same,shape:t.si+1,angle:t.angle,start:performance.now()};
   mrUI.feedback.style.color='var(--good)';mrUI.feedback.textContent='Respond within '+cfg.mrWindow/1000+' s: S = same, D = different';
-  rotationTimeout=setTimeout(()=>answerRotation(null),cfg.mrWindow);
+  clearTimeout(rotationTimeout);rotationTimeout=setTimeout(()=>answerRotation(null),cfg.mrWindow-30);
 }
+function newRotationTrial(){showRotationTrial(null);}
 function answerRotation(isSame){
   if(!rotationTrial)return;
   clearTimeout(rotationTimeout);
@@ -306,12 +331,17 @@ function answerRotation(isSame){
   const answerTxt=cur.same?'they were the same object':'they were different (mirror images)';
   mrUI.feedback.textContent=isSame===null?'Time expired — '+answerTxt:(ok?'Correct':'Incorrect — '+answerTxt)+' ('+rt+' ms)';
   mrUI.log.innerHTML='Trial '+sec.total+': '+(cur.same?'same':'different')+' | '+cur.angle+'° | '+(isSame===null?'miss':isSame?'same':'different')+' | '+(ok?'correct':'incorrect')+' | '+(rt===null?'—':rt+' ms')+'<br>'+mrUI.log.innerHTML;
-  nextTrialTimeout=setTimeout(newRotationTrial,block&&block.practice?1500:MR_ITI);
+  if(block&&block.practice)nextTrialTimeout=setTimeout(newRotationTrial,1500); // practice: self-paced
+  else blankObjects();                                                             // main: wait for the next fixed slot
 }
 const ROTATION={
   ui:mrUI,
-  start(){newRotationTrial();},
-  stop(){clearTimeout(rotationTimeout);clearTimeout(nextTrialTimeout);rotationTrial=null;blankObjects();mrUI.feedback.textContent='';},
+  start(){
+    if(block.practice){newRotationTrial();return;}
+    const n=mrTrialsPerBlock(),list=buildRotationList(n);block.trialsPlanned=n;block.soaMs=mrSoaMs();
+    runPaced(mrSoaMs(),n,i=>showRotationTrial(list[i]));
+  },
+  stop(){stopPaced();clearTimeout(rotationTimeout);clearTimeout(nextTrialTimeout);rotationTrial=null;blankObjects();mrUI.feedback.textContent='';},
   onKey(k){if(k==='s')answerRotation(true);else if(k==='d')answerRotation(false);}
 };
 blankObjects();
@@ -364,20 +394,31 @@ loadStimuli();
 
 function pickPhonemePair(practice){
   const same=Math.random()<.5;
-  if(same){const a=1+Math.floor(Math.random()*STEPS);return [a,a,true];}
-  if(practice){const p=PRACTICE_PAIRS[Math.floor(Math.random()*PRACTICE_PAIRS.length)];return Math.random()<.5?[p[0],p[1],false]:[p[1],p[0],false];}
-  const d=cfg.stepDiff,lo=1+Math.floor(Math.random()*(STEPS-d));return Math.random()<.5?[lo,lo+d,false]:[lo+d,lo,false];
+  if(same){const a=1+Math.floor(Math.random()*STEPS);return [a,a];}
+  if(practice){const p=PRACTICE_PAIRS[Math.floor(Math.random()*PRACTICE_PAIRS.length)];return Math.random()<.5?[p[0],p[1]]:[p[1],p[0]];}
+  const d=cfg.stepDiff,lo=1+Math.floor(Math.random()*(STEPS-d));return Math.random()<.5?[lo,lo+d]:[lo+d,lo];
 }
-function newAudioTrial(){
+// Fixed slot for main blocks: first syllable, 0.4 s gap, second syllable, full response window, rounded up to 0.1 s.
+// With 0.5 s syllables and a 2 s window this is 3.0 s → 60 pairs per 3-minute block.
+function phonemeSoaMs(){const dur=tokenCache[1]?tokenCache[1].duration:0.5;return Math.ceil((0.05+dur+ISI+cfg.audWindow/1000+0.05)*10-1e-9)*100;}
+function phonemeTrialsPerBlock(){return Math.floor(cfg.blockMs/phonemeSoaMs());}
+// Main-block list: every "same" pair (1–1 … 7–7) and every "different" pair in both orders equally often.
+function buildPhonemeList(n){
+  const unit=[];for(let a=1;a<=STEPS;a++)unit.push([a,a]);
+  for(let lo=1;lo+cfg.stepDiff<=STEPS;lo++){unit.push([lo,lo+cfg.stepDiff]);unit.push([lo+cfg.stepDiff,lo]);}
+  return balancedList(unit,n);
+}
+function newAudioTrial(pair){
   if(!block)return;
-  const pr=pickPhonemePair(block.practice),a=pr[0],b=pr[1],same=pr[2];
+  if(audioTrial)answerAudio(null); // previous slot ended without a response
+  const pr=pair||pickPhonemePair(block.practice),a=pr[0],b=pr[1],same=a===b;
   const now=audioContext.currentTime,t1=now+.05,t2=t1+tokenCache[a].duration+ISI;
   playSyllable(a,t1);playSyllable(b,t2);
   const msToSecond=(t2-now)*1000;
   audioTrial={a:a,b:b,answer:same?'same':'different',start:performance.now()+msToSecond}; // RT from second-syllable onset
   soundStatus.textContent='Listen…';soundHint.textContent='Respond: S = same, D = different';
-  promptTimer=setTimeout(()=>{if(audioTrial){soundStatus.textContent='Same or different?';audUI.feedback.style.color='var(--good)';audUI.feedback.textContent='S = same     D = different';}},msToSecond+300);
-  audioTimer=setTimeout(()=>{if(audioTrial)answerAudio(null);},msToSecond+cfg.audWindow);
+  clearTimeout(promptTimer);promptTimer=setTimeout(()=>{if(audioTrial){soundStatus.textContent='Same or different?';audUI.feedback.style.color='var(--good)';audUI.feedback.textContent='S = same     D = different';}},msToSecond+300);
+  clearTimeout(audioTimer);audioTimer=setTimeout(()=>{if(audioTrial)answerAudio(null);},msToSecond+cfg.audWindow);
 }
 function answerAudio(response){
   if(!audioTrial)return;
@@ -390,12 +431,17 @@ function answerAudio(response){
   audUI.feedback.textContent=response?(ok?'Correct':'Incorrect — they were '+cur.answer)+' ('+rt+' ms)':'Too slow — they were '+cur.answer;
   audUI.log.innerHTML='Trial '+sec.total+': steps '+cur.a+'–'+cur.b+' ('+cur.answer+') | '+(response||'miss')+' | '+(ok?'correct':'incorrect')+' | '+(rt===null?'—':rt+' ms')+'<br>'+audUI.log.innerHTML;
   soundStatus.textContent='Waiting for next pair…';
-  audioTimer=setTimeout(newAudioTrial,AUD_ITI);
+  if(block&&block.practice)audioTimer=setTimeout(()=>newAudioTrial(null),AUD_ITI); // practice: self-paced
 }
 const PHONEME={
   ui:audUI,
-  start(){ensureAudio();newAudioTrial();},
-  stop(){clearTimeout(audioTimer);clearTimeout(promptTimer);audioTrial=null;soundStatus.textContent='Ready';soundHint.textContent='Use headphones.';audUI.feedback.textContent='';},
+  start(){
+    ensureAudio();
+    if(block.practice){newAudioTrial(null);return;}
+    const n=phonemeTrialsPerBlock(),list=buildPhonemeList(n);block.trialsPlanned=n;block.soaMs=phonemeSoaMs();
+    runPaced(phonemeSoaMs(),n,i=>newAudioTrial(list[i]));
+  },
+  stop(){stopPaced();clearTimeout(audioTimer);clearTimeout(promptTimer);audioTrial=null;soundStatus.textContent='Ready';soundHint.textContent='Use headphones.';audUI.feedback.textContent='';},
   onKey(k){if(k==='s')answerAudio('same');else if(k==='d')answerAudio('different');}
 };
 function playTestSounds(){if(!ensureAudio())return false;const t=audioContext.currentTime+.05;playSyllable(1,t);playSyllable(STEPS,t+tokenCache[1].duration+ISI);return true;}
@@ -430,6 +476,7 @@ function showSetup(){
       <label>Practice accuracy criterion (%)<input id="f_crit" type="number" value="75" min="0" max="100"></label>
       <label>Max practice attempts per task<input id="f_att" type="number" value="3" min="1" max="10"></label>
     </div>
+    <p class="hint" id="pacingInfo"></p>
     <p class="hint" id="stimStatus"></p>
     <div id="formMsg"></div>
     <button id="startExp">Start experiment</button> &nbsp; <button class="alt" id="testSound">Play test sound</button>
@@ -437,6 +484,10 @@ function showSetup(){
   screen.classList.remove('hidden');hud.classList.add('hidden');main.classList.add('hidden');
   $('#testSound').onclick=()=>{if(!playTestSounds())$('#formMsg').textContent=stimStatus==='loading'?'The sound files are still loading.':'Sound files could not be loaded.';};
   $('#startExp').onclick=startExperiment;
+  const pacing=()=>{const blk=Number($('#f_block').value)*1000,aw=Number($('#f_aud').value),mw=Number($('#f_mr').value);
+    const dur=tokenCache[1]?tokenCache[1].duration:0.5,psoa=Math.ceil((0.05+dur+ISI+aw+0.05)*10-1e-9)/10;
+    $('#pacingInfo').textContent='Main blocks (fixed pacing): phoneme '+Math.floor(blk/1000/psoa)+' pairs, one every '+psoa.toFixed(1)+' s · mental rotation '+Math.floor(blk/1000/mw)+' pairs, one every '+mw+' s.';};
+  ['#f_block','#f_aud','#f_mr'].forEach(id=>$(id).addEventListener('input',pacing));pacing();
   updateStimStatus();
 }
 function startExperiment(){
@@ -490,7 +541,7 @@ function showInstructions(note){
     ${firstMain?'<p><b>Practice is over.</b> The real experiment starts now.</p>':''}
     <div class="kicker">${kicker}</div>
     <h1>${b.def.label}</h1>
-    <p>This ${b.practice?'practice block':'block'} lasts ${fmtTime(b.ms)}.</p>
+    <p>This ${b.practice?'practice block':'block'} lasts ${fmtTime(b.ms)}.${!b.practice&&b.def.sec==='phoneme'?` You will hear ${phonemeTrialsPerBlock()} pairs, one every ${phonemeSoaMs()/1000} s.`:''}${!b.practice&&b.def.sec==='rotation'?` You will see ${mrTrialsPerBlock()} pairs, one every ${mrSoaMs()/1000} s.`:''}</p>
     ${taskText(b)}
     ${gate}
     <button id="beginBlock">Start ${b.practice?'practice':'block'}</button> <span class="hint">&nbsp;or press Enter</span>`;
@@ -508,7 +559,8 @@ function runBlock(){
   if(!waitingStart||needsHeadphoneCheck(plan[planIdx]))return;waitingStart=false;
   if(document.activeElement)document.activeElement.blur();
   const b=plan[planIdx],d=b.def;blockCounter++;
-  block=Object.assign({},b,{n:blockCounter,startPerf:performance.now(),endsAt:performance.now()+b.ms});
+  const blockMs=b.practice?b.ms:b.ms+250; // main blocks: small buffer so the last trial's response window closes inside the block
+  block=Object.assign({},b,{n:blockCounter,startPerf:performance.now(),endsAt:performance.now()+blockMs});
   T={score:0,lines:0,pieces:0,gameOvers:0,holesCreated:0,placeSum:0,placeN:0,hard:0,stackSum:0};
   sec={total:0,correct:0,misses:0,rtSum:0,rtN:0};
   ['#score','#lines','#overs'].forEach(s=>$(s).textContent='0');$('#tetrisHint').classList.add('hidden');
@@ -523,7 +575,7 @@ function runBlock(){
   if(b.practice&&b.id==='tetris_only'&&cfg.calibrate){CAL={start:performance.now(),pieces:0,holes:0,maxStack:0,gameOver:false};calTimer=setInterval(()=>calibrationStep(CAL_WINDOW_MS),CAL_WINDOW_MS);}
   draw();
   if(d.sec)MODS[d.sec].start();
-  blockTimer=setTimeout(()=>endBlock('completed'),b.ms);
+  blockTimer=setTimeout(()=>endBlock('completed'),blockMs);
   clockTimer=setInterval(()=>{$('#timer').textContent=fmtTime(block?block.endsAt-performance.now():0);},250);
 }
 function endBlock(reason){
@@ -554,7 +606,7 @@ function endBlock(reason){
   }
   logRow('block_summary',{duration_s:r(el/1000,1),lines_per_min:r(S.lines_per_min,2),holes_per_piece:r(S.holes_per_piece,3),mean_stack_height:r(S.mean_stack_height,2),
     mean_placement_ms:r(S.mean_placement_ms,0),hard_drop_pct:d.tetris&&T.pieces?+(T.hard/T.pieces*100).toFixed(1):'',
-    secondary_trials:d.sec?sec.total:'',secondary_accuracy_pct:r(S.accuracy,1),secondary_misses:d.sec?sec.misses:'',
+    secondary_trials:d.sec?sec.total:'',trials_planned:block.trialsPlanned||'',soa_ms:block.soaMs||'',secondary_accuracy_pct:r(S.accuracy,1),secondary_misses:d.sec?sec.misses:'',
     secondary_mean_rt_correct_ms:r(S.rt,0),criterion_met:met,ended:reason});
   if(!block.practice&&reason==='completed')results[block.id]=S;
   block=null;board=emptyBoard();piece=null;draw();
