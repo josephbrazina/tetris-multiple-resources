@@ -27,6 +27,7 @@ kbd{min-width:42px;padding:5px 10px;border:1px solid #6c7890;border-bottom-width
 .feedback{min-height:24px;text-align:center;font-weight:700;color:var(--good)}
 .log{max-height:100px;overflow:auto;margin-top:16px;font:12px/1.3 ui-monospace,monospace;color:var(--muted)}
 button{cursor:pointer;border:0;border-radius:8px;padding:11px 18px;background:var(--accent);color:#07121b;font-weight:800;font-size:1rem}
+.gate{margin:18px 0;padding:14px 16px;border:1px solid var(--line);border-radius:10px;background:#111827}.gate label{display:flex;gap:10px;align-items:center;color:var(--text)}button:disabled{opacity:.4;cursor:default}
 button.alt{background:transparent;color:var(--accent);border:1px solid var(--accent)}button.small{padding:6px 12px;font-size:.85rem}
 .game{display:flex;justify-content:center;align-items:flex-start;gap:16px}.side{min-width:120px}
 .score{font-size:1.5rem;font-weight:800;color:var(--accent);margin-bottom:8px}
@@ -60,7 +61,7 @@ canvas{display:block;border:2px solid #60708f;background:#0d1320;image-rendering
     <h1>Phoneme Discrimination</h1>
     <p>Hear two syllables and judge whether they are the same or different.</p>
     <div class="status"><span>Trial <b id="audTrial">0</b></span><span>Accuracy <b id="audAcc">—</b></span></div>
-    <div class="listen"><div><div class="ear">◖</div><b id="soundStatus">Ready</b><span id="soundHint">Use headphones if available.</span></div></div>
+    <div class="listen"><div><div class="ear">◖</div><b id="soundStatus">Ready</b><span id="soundHint">Use headphones.</span></div></div>
     <div class="response"><kbd>S</kbd>&nbsp; same &nbsp;&nbsp;&nbsp;&nbsp; <kbd>D</kbd>&nbsp; different</div>
     <div class="feedback" id="audFeedback" aria-live="polite"></div>
     <div class="log" id="audLog"></div>
@@ -86,23 +87,25 @@ const BLOCKS={
   tetris_rotation:  {label:'Tetris + mental rotation',tetris:true,sec:'rotation'},
   tetris_phoneme:   {label:'Tetris + phoneme discrimination',tetris:true,sec:'phoneme'}
 };
+const ALL_CONDITIONS=['tetris_only','rotation_only','phoneme_only','tetris_rotation','tetris_phoneme'];
 const SINGLE=['tetris_only','rotation_only','phoneme_only'],DUAL=['tetris_rotation','tetris_phoneme'];
-const CSV_COLUMNS=['participant','experiment_start','order','block_n','block','practice','row_type','t_ms','drop_ms','response_window_ms',
+const CSV_COLUMNS=['participant','experiment_start','order','block_n','block','practice','practice_attempt','row_type','t_ms','drop_ms','response_window_ms',
   'trial','step_a','step_b','shape','angle_deg','axis','correct_answer','response','correct','rt_ms',
   'piece_n','piece_type','first_action_ms','placement_ms','lock_ms','moves','rotations','soft_drops','hard_drop','lines_cleared','holes_created','holes_total','stack_height','score',
   'tetris_lines_total','tetris_pieces_total','tetris_game_overs',
-  'duration_s','lines_per_min','holes_per_piece','mean_placement_ms','hard_drop_pct','secondary_trials','secondary_accuracy_pct','secondary_misses','secondary_mean_rt_correct_ms','ended',
-  'comparison','measure','single_value','dual_value','decrement_pct'];
+  'calib_window_s','calib_max_stack','calib_holes_per_piece','calib_game_over','calib_action',
+  'duration_s','lines_per_min','holes_per_piece','mean_stack_height','mean_placement_ms','hard_drop_pct','secondary_trials','secondary_accuracy_pct','secondary_misses','secondary_mean_rt_correct_ms','criterion_met','ended',
+  'comparison','measure','single_value','dual_value','difference','decrement_pct'];
 
-let cfg=null,plan=[],planIdx=-1,block=null,allRows=[],experimentStart=null,finished=false;
-let T,sec;
+let cfg=null,plan=[],planIdx=-1,block=null,allRows=[],experimentStart=null,finished=false,blockCounter=0;
+let T,sec,CAL=null;
 const shuffle=a=>{a=a.slice();for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a;};
 const fmtTime=ms=>{const s=Math.ceil(Math.max(0,ms)/1000);return Math.floor(s/60)+':'+String(s%60).padStart(2,'0');};
 
 // ---------- Data ----------
 function baseRow(type){
   const b=block;
-  return {participant:cfg.pid,experiment_start:experimentStart.toISOString(),order:cfg.orderLabel,block_n:b.n,block:b.id,practice:b.practice?1:0,
+  return {participant:cfg.pid,experiment_start:experimentStart.toISOString(),order:cfg.orderLabel,block_n:b.n,block:b.id,practice:b.practice?1:0,practice_attempt:b.practice?b.attempt:'',
     row_type:type,t_ms:Math.round(performance.now()-b.startPerf),drop_ms:b.def.tetris?cfg.dropMs:'',
     response_window_ms:b.def.sec==='rotation'?cfg.mrWindow:b.def.sec==='phoneme'?cfg.audWindow:'',
     tetris_lines_total:b.def.tetris?T.lines:'',tetris_pieces_total:b.def.tetris?T.pieces:'',tetris_game_overs:b.def.tetris?T.gameOvers:''};
@@ -117,11 +120,11 @@ function recordSecondary(ui,fields){
 }
 function csvCell(v){if(v===null||v===undefined)return '';v=String(v);return /[",\r\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v;}
 function stamp(d){const p=n=>String(n).padStart(2,'0');return d.getFullYear()+p(d.getMonth()+1)+p(d.getDate())+'-'+p(d.getHours())+p(d.getMinutes())+p(d.getSeconds());}
+function csvName(){return 'dualtask_'+cfg.pid.replace(/[^\w-]/g,'_')+'_'+stamp(experimentStart)+'.csv';}
 function downloadCSV(){
   const csv=[CSV_COLUMNS.join(',')].concat(allRows.map(r=>CSV_COLUMNS.map(c=>csvCell(r[c])).join(','))).join('\r\n');
   const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));
-  a.download='dualtask_'+cfg.pid.replace(/[^\w-]/g,'_')+'_'+stamp(experimentStart)+'.csv';
-  document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),3000);
+  a.download=csvName();document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),3000);
 }
 
 // ---------- Tetris ----------
@@ -139,21 +142,25 @@ function spawn(){
   const type=nextType;nextType=randType();
   piece={type:type,m:PIECES[type].map(r=>r.slice()),x:3,y:0};
   pieceStats={spawn:performance.now(),first:null,last:null,moves:0,rotations:0,soft:0};
-  if(collide()){T.gameOvers++;logRow('game_over',{score:T.score,stack_height:ROWS});board=emptyBoard();$('#overs').textContent=T.gameOvers;spawn();}
+  if(collide()){
+    T.gameOvers++;if(CAL)CAL.gameOver=true;
+    logRow('game_over',{score:T.score,stack_height:ROWS});board=emptyBoard();$('#overs').textContent=T.gameOvers;spawn();
+  }
 }
 function lock(hard){
   const before=countHoles();
   piece.m.forEach((r,y)=>r.forEach((v,x)=>{if(v&&piece.y+y>=0)board[piece.y+y][piece.x+x]=v;}));
   const created=Math.max(0,countHoles()-before);
   let n=0;for(let y=ROWS-1;y>=0;y--)if(board[y].every(Boolean)){board.splice(y,1);board.unshift(Array(COLS).fill(0));n++;y++;}
-  const ps=pieceStats,lockMs=Math.round(performance.now()-ps.spawn),placement=ps.last===null?null:Math.round(ps.last-ps.spawn);
-  T.lines+=n;T.score+=[0,100,300,500,800][n];T.pieces++;T.holesCreated+=created;T.hard+=hard?1:0;
+  const ps=pieceStats,lockMs=Math.round(performance.now()-ps.spawn),placement=ps.last===null?null:Math.round(ps.last-ps.spawn),h=stackHeight();
+  T.lines+=n;T.score+=[0,100,300,500,800][n];T.pieces++;T.holesCreated+=created;T.hard+=hard?1:0;T.stackSum+=h;
   if(placement!==null){T.placeSum+=placement;T.placeN++;}
+  if(CAL){CAL.pieces++;CAL.holes+=created;CAL.maxStack=Math.max(CAL.maxStack,h);}
   $('#score').textContent=T.score;$('#lines').textContent=T.lines;
   logRow('tetris_piece',{piece_n:T.pieces,piece_type:PIECE_NAMES[piece.type],
     first_action_ms:ps.first===null?'':Math.round(ps.first-ps.spawn),placement_ms:placement,lock_ms:lockMs,
     moves:ps.moves,rotations:ps.rotations,soft_drops:ps.soft,hard_drop:hard?1:0,
-    lines_cleared:n,holes_created:created,holes_total:countHoles(),stack_height:stackHeight(),score:T.score});
+    lines_cleared:n,holes_created:created,holes_total:countHoles(),stack_height:h,score:T.score});
   spawn();
 }
 // placement_ms = spawn → last positioning keypress (move, rotate or hard drop): decision time without passive falling.
@@ -175,8 +182,23 @@ function draw(){
 }
 function loop(t){if(tetrisOn&&t-dropAt>cfg.dropMs){piece.y++;if(collide()){piece.y--;lock(false);}dropAt=t;draw();}requestAnimationFrame(loop);}
 requestAnimationFrame(loop);
-// ---------- Secondary task: 3D mental rotation (depth rotations of 80°, 120°, 160°) ----------
-const ANGLES=[80,120,160],MR_ITI=800;
+
+// ---------- Tetris speed calibration (Tetris practice only) ----------
+// Every 30 s: game over or stack ≥ 14 rows → 100 ms slower; stack ≤ 7 rows with ≤ 0.5 holes per piece → 50 ms faster.
+const CAL_WINDOW_MS=30000,CAL_MIN=300,CAL_MAX=1000;
+function calibrationStep(windowMs){
+  if(!CAL)return;
+  const hpp=CAL.pieces?CAL.holes/CAL.pieces:0;let action='keep';
+  if(CAL.gameOver||CAL.maxStack>=14){cfg.dropMs=Math.min(CAL_MAX,cfg.dropMs+100);action='slower';}
+  else if(CAL.pieces>0&&CAL.maxStack<=7&&hpp<=0.5){cfg.dropMs=Math.max(CAL_MIN,cfg.dropMs-50);action='faster';}
+  logRow('calibration',{calib_window_s:+(windowMs/1000).toFixed(1),calib_max_stack:CAL.maxStack,calib_holes_per_piece:+hpp.toFixed(3),calib_game_over:CAL.gameOver?1:0,calib_action:action});
+  CAL={start:performance.now(),pieces:0,holes:0,maxStack:stackHeight(),gameOver:false};
+}
+// ---------- Secondary task: 3D mental rotation ----------
+// Main blocks: depth rotations of 80°, 120°, 160°. Practice also includes 0° and 40°.
+// Only "clear" views are shown: every cube of both objects must be visibly drawn (no hidden parts),
+// following Shepard & Metzler (1971), who excluded views where part of an object was occluded.
+const ANGLES_MAIN=[80,120,160],ANGLES_PRACTICE=[0,40,80,120,160],MR_ITI=800;
 const reference=$('#reference'),comparison=$('#comparison');
 const mrUI={trial:$('#mrTrial'),acc:$('#mrAcc'),feedback:$('#mrFeedback'),log:$('#mrLog')};
 // Shepard–Metzler-style objects: 10 cubes in 4 arms bending through all three dimensions.
@@ -203,39 +225,69 @@ function isChiral(cells){const m=canon(cells.map(([x,y,z])=>[-x,y,z]));return !C
 const shapes=SHAPE_SPECS.map(buildShape).filter(isChiral);
 // Fixed viewing angle (camera looks slightly down and from the side), mild perspective.
 const VIEW=mul(rotX(rad(22)),rotY(rad(-32))), CAM=14, LIGHT=(function(){const l=[-0.45,0.7,0.55],n=Math.hypot(...l);return l.map(v=>v/n)})();
-function renderObject(canvas,cells,M){
-  const c=canvas.getContext('2d'),W=canvas.width,H=canvas.height;
-  c.fillStyle='#111827';c.fillRect(0,0,W,H);
+
+// Geometry shared by drawing and by the clear-view check. Returns visible faces (far → near) in screen coordinates.
+function buildFaces(cells,M,W,H){
   const n=cells.length,cen=[0,1,2].map(i=>cells.reduce((s,p)=>s+p[i],0)/n+0.5);
   const key=p=>p.join(','),set=new Set(cells.map(key)),dirs=[[1,0,0],[-1,0,0],[0,1,0],[0,-1,0],[0,0,1],[0,0,-1]],faces=[];
   let R=0;
-  cells.forEach(function(p){dirs.forEach(function(d){
-    if(set.has(key([p[0]+d[0],p[1]+d[1],p[2]+d[2]])))return;   // skip faces hidden between touching cubes
+  cells.forEach(function(p,ci){dirs.forEach(function(d){
+    if(set.has(key([p[0]+d[0],p[1]+d[1],p[2]+d[2]])))return;   // faces between touching cubes are never seen
     const ax=d.findIndex(v=>v!==0),u=(ax+1)%3,v=(ax+2)%3,off=d[ax]>0?1:0;
     const pts=[[0,0],[1,0],[1,1],[0,1]].map(function(ab){const q=p.slice();q[ax]+=off;q[u]+=ab[0];q[v]+=ab[1];const w=apply(M,q.map((x,i)=>x-cen[i]));R=Math.max(R,Math.hypot(...w));return w});
-    faces.push({pts:pts,n:apply(M,d)});
+    faces.push({pts:pts,n:apply(M,d),cube:ci});
   })});
   // Same object size on every trial regardless of orientation, so size is never a cue.
-  const scale=1.35*(Math.min(W,H)/2-24)/(R*CAM/(CAM-R));
+  const scale=1.35*(Math.min(W,H)/2-24*W/420)/(R*CAM/(CAM-R));
   const proj=q=>[W/2+q[0]*scale*CAM/(CAM-q[2]),H/2-q[1]*scale*CAM/(CAM-q[2])];
-  faces.forEach(function(f){f.c=[0,1,2].map(i=>(f.pts[0][i]+f.pts[1][i]+f.pts[2][i]+f.pts[3][i])/4);f.vis=f.n[0]*(-f.c[0])+f.n[1]*(-f.c[1])+f.n[2]*(CAM-f.c[2])>0;f.dist=Math.hypot(f.c[0],f.c[1],CAM-f.c[2])});
-  faces.filter(f=>f.vis).sort((a,b)=>b.dist-a.dist).forEach(function(f){
+  faces.forEach(function(f){f.c=[0,1,2].map(i=>(f.pts[0][i]+f.pts[1][i]+f.pts[2][i]+f.pts[3][i])/4);
+    f.vis=f.n[0]*(-f.c[0])+f.n[1]*(-f.c[1])+f.n[2]*(CAM-f.c[2])>0;f.dist=Math.hypot(f.c[0],f.c[1],CAM-f.c[2]);f.p2=f.pts.map(proj);});
+  return faces.filter(f=>f.vis).sort((a,b)=>b.dist-a.dist);
+}
+function renderObject(canvas,cells,M){
+  const c=canvas.getContext('2d'),W=canvas.width,H=canvas.height;
+  c.fillStyle='#111827';c.fillRect(0,0,W,H);
+  buildFaces(cells,M,W,H).forEach(function(f){
     const diff=Math.max(0,f.n[0]*LIGHT[0]+f.n[1]*LIGHT[1]+f.n[2]*LIGHT[2]);
-    c.beginPath();f.pts.map(proj).forEach((q,i)=>i?c.lineTo(q[0],q[1]):c.moveTo(q[0],q[1]));c.closePath();
+    c.beginPath();f.p2.forEach((q,i)=>i?c.lineTo(q[0],q[1]):c.moveTo(q[0],q[1]));c.closePath();
     c.fillStyle='hsl(196,72%,'+(24+46*diff)+'%)';c.fill();
     c.lineJoin='round';c.lineWidth=2.4;c.strokeStyle='#0a101c';c.stroke();
   });
 }
-
+// Clear-view check: rasterise the drawing at low resolution. For every cube, compare how much of it is
+// visible in the full drawing with how much it would show if nothing were in front of it.
+// A view passes only if every cube keeps at least 40% of its own visible area (no cube is mostly hidden).
+function inQuad(x,y,P){let sgn=0;for(let i=0;i<4;i++){const a=P[i],b=P[(i+1)%4],cr=(b[0]-a[0])*(y-a[1])-(b[1]-a[1])*(x-a[0]);if(cr!==0){const s=cr>0?1:-1;if(sgn&&s!==sgn)return false;sgn=s;}}return true;}
+const CLEAR_MIN_VISIBLE=0.4;
+function viewIsClear(cells,M){
+  const W=140,H=166,buf=new Int16Array(W*H).fill(-1),own=cells.map(()=>new Set());
+  buildFaces(cells,M,W,H).forEach(function(f){
+    const xs=f.p2.map(p=>p[0]),ys=f.p2.map(p=>p[1]);
+    const x0=Math.max(0,Math.floor(Math.min(...xs))),x1=Math.min(W-1,Math.ceil(Math.max(...xs))),y0=Math.max(0,Math.floor(Math.min(...ys))),y1=Math.min(H-1,Math.ceil(Math.max(...ys)));
+    for(let y=y0;y<=y1;y++)for(let x=x0;x<=x1;x++)if(inQuad(x+.5,y+.5,f.p2)){buf[y*W+x]=f.cube;own[f.cube].add(y*W+x);}
+  });
+  const vis=new Array(cells.length).fill(0);for(let i=0;i<buf.length;i++)if(buf[i]>=0)vis[buf[i]]++;
+  return vis.every((v,i)=>own[i].size>0&&v/own[i].size>=CLEAR_MIN_VISIBLE);
+}
 let rotationTrial=null,rotationTimeout=null,nextTrialTimeout=null;
 function blankObjects(){[reference,comparison].forEach(c=>{const g=c.getContext('2d');g.fillStyle='#111827';g.fillRect(0,0,c.width,c.height);});}
+function pickRotationTrial(practice){
+  const angles=practice?ANGLES_PRACTICE:ANGLES_MAIN;let t=null;
+  for(let tries=0;tries<400;tries++){
+    const si=Math.floor(Math.random()*shapes.length),same=Math.random()<.5,base=CUBE_ROTS[Math.floor(Math.random()*CUBE_ROTS.length)];
+    const angle=angles[Math.floor(Math.random()*angles.length)],sign=Math.random()<.5?1:-1;
+    const shape=shapes[si],cmpShape=same?shape:shape.map(([x,y,z])=>[-x,y,z]);
+    const Mref=mul(VIEW,base),Mcmp=mul(rotY(rad(sign*angle)),Mref);
+    t={si:si,same:same,angle:angle,shape:shape,cmpShape:cmpShape,Mref:Mref,Mcmp:Mcmp};
+    if(viewIsClear(shape,Mref)&&viewIsClear(cmpShape,Mcmp))return t;
+  }
+  return t;
+}
 function newRotationTrial(){
   if(!block)return;
-  const si=Math.floor(Math.random()*shapes.length),shape=shapes[si],same=Math.random()<.5,base=CUBE_ROTS[Math.floor(Math.random()*CUBE_ROTS.length)];
-  const angle=ANGLES[Math.floor(Math.random()*ANGLES.length)],sign=Math.random()<.5?1:-1;
-  const Mref=mul(VIEW,base),Mcmp=mul(rotY(rad(sign*angle)),Mref);
-  renderObject(reference,shape,Mref);renderObject(comparison,same?shape:shape.map(([x,y,z])=>[-x,y,z]),Mcmp);
-  rotationTrial={same:same,shape:si+1,angle:angle,start:performance.now()};
+  const t=pickRotationTrial(block.practice);
+  renderObject(reference,t.shape,t.Mref);renderObject(comparison,t.cmpShape,t.Mcmp);
+  rotationTrial={same:t.same,shape:t.si+1,angle:t.angle,start:performance.now()};
   mrUI.feedback.style.color='var(--good)';mrUI.feedback.textContent='Respond within '+cfg.mrWindow/1000+' s: S = same, D = different';
   rotationTimeout=setTimeout(()=>answerRotation(null),cfg.mrWindow);
 }
@@ -246,9 +298,10 @@ function answerRotation(isSame){
   const ok=isSame!==null&&isSame===cur.same,rt=isSame===null?null:Math.round(performance.now()-cur.start);
   recordSecondary(mrUI,{shape:cur.shape,angle_deg:cur.angle,axis:'depth',correct_answer:cur.same?'same':'different',response:isSame===null?'none':isSame?'same':'different',correct:ok?1:0,rt_ms:rt});
   mrUI.feedback.style.color=ok?'var(--good)':'var(--bad)';
-  mrUI.feedback.textContent=isSame===null?'Time expired — no response':(ok?'Correct':'Incorrect')+' — '+rt+' ms';
+  const answerTxt=cur.same?'they were the same object':'they were different (mirror images)';
+  mrUI.feedback.textContent=isSame===null?'Time expired — '+answerTxt:(ok?'Correct':'Incorrect — '+answerTxt)+' ('+rt+' ms)';
   mrUI.log.innerHTML='Trial '+sec.total+': '+(cur.same?'same':'different')+' | '+cur.angle+'° | '+(isSame===null?'miss':isSame?'same':'different')+' | '+(ok?'correct':'incorrect')+' | '+(rt===null?'—':rt+' ms')+'<br>'+mrUI.log.innerHTML;
-  nextTrialTimeout=setTimeout(newRotationTrial,MR_ITI);
+  nextTrialTimeout=setTimeout(newRotationTrial,block&&block.practice?1500:MR_ITI);
 }
 const ROTATION={
   ui:mrUI,
@@ -258,7 +311,10 @@ const ROTATION={
 };
 blankObjects();
 // ---------- Secondary task: phoneme (AX) discrimination on a 7-step /ba/–/ga/ continuum ----------
-const STEPS=7,STEP_DIFF=2,ISI=0.4,AUD_ITI=1800;
+// Main blocks: "different" pairs are cfg.stepDiff steps apart (default 3).
+// Practice: "different" pairs are far apart (4–6 steps) so the task is easy to learn.
+const STEPS=7,ISI=0.4,AUD_ITI=1800;
+const PRACTICE_PAIRS=[[1,5],[1,6],[1,7],[2,6],[2,7],[3,7]];
 const soundStatus=$('#soundStatus'),soundHint=$('#soundHint');
 const audUI={trial:$('#audTrial'),acc:$('#audAcc'),feedback:$('#audFeedback'),log:$('#audLog')};
 let audioTrial=null,audioTimer=null,promptTimer=null;
@@ -300,10 +356,16 @@ function playSyllable(step,t){
   src.connect(g);g.connect(audioContext.destination);src.start(t);
 }
 loadStimuli();
+
+function pickPhonemePair(practice){
+  const same=Math.random()<.5;
+  if(same){const a=1+Math.floor(Math.random()*STEPS);return [a,a,true];}
+  if(practice){const p=PRACTICE_PAIRS[Math.floor(Math.random()*PRACTICE_PAIRS.length)];return Math.random()<.5?[p[0],p[1],false]:[p[1],p[0],false];}
+  const d=cfg.stepDiff,lo=1+Math.floor(Math.random()*(STEPS-d));return Math.random()<.5?[lo,lo+d,false]:[lo+d,lo,false];
+}
 function newAudioTrial(){
   if(!block)return;
-  const same=Math.random()<.5,a=1+Math.floor(Math.random()*STEPS);let b=a;
-  if(!same){const o=[];if(a+STEP_DIFF<=STEPS)o.push(a+STEP_DIFF);if(a-STEP_DIFF>=1)o.push(a-STEP_DIFF);b=o[Math.floor(Math.random()*o.length)];}
+  const pr=pickPhonemePair(block.practice),a=pr[0],b=pr[1],same=pr[2];
   const now=audioContext.currentTime,t1=now+.05,t2=t1+tokenCache[a].duration+ISI;
   playSyllable(a,t1);playSyllable(b,t2);
   const msToSecond=(t2-now)*1000;
@@ -320,45 +382,55 @@ function answerAudio(response){
   const ok=response===cur.answer,rt=response?Math.round(performance.now()-cur.start):null;
   recordSecondary(audUI,{step_a:cur.a,step_b:cur.b,correct_answer:cur.answer,response:response||'none',correct:ok?1:0,rt_ms:rt});
   audUI.feedback.style.color=ok?'var(--good)':'var(--bad)';
-  audUI.feedback.textContent=response?(ok?'Correct':'Incorrect')+' — '+rt+' ms':'Too slow — no response';
+  audUI.feedback.textContent=response?(ok?'Correct':'Incorrect — they were '+cur.answer)+' ('+rt+' ms)':'Too slow — they were '+cur.answer;
   audUI.log.innerHTML='Trial '+sec.total+': steps '+cur.a+'–'+cur.b+' ('+cur.answer+') | '+(response||'miss')+' | '+(ok?'correct':'incorrect')+' | '+(rt===null?'—':rt+' ms')+'<br>'+audUI.log.innerHTML;
   soundStatus.textContent='Waiting for next pair…';
   audioTimer=setTimeout(newAudioTrial,AUD_ITI);
 }
 const PHONEME={
   ui:audUI,
-  start(){newAudioTrial();},
-  stop(){clearTimeout(audioTimer);clearTimeout(promptTimer);audioTrial=null;soundStatus.textContent='Ready';soundHint.textContent='Use headphones if available.';audUI.feedback.textContent='';},
+  start(){ensureAudio();newAudioTrial();},
+  stop(){clearTimeout(audioTimer);clearTimeout(promptTimer);audioTrial=null;soundStatus.textContent='Ready';soundHint.textContent='Use headphones.';audUI.feedback.textContent='';},
   onKey(k){if(k==='s')answerAudio('same');else if(k==='d')answerAudio('different');}
 };
+function playTestSounds(){if(!ensureAudio())return false;const t=audioContext.currentTime+.05;playSyllable(1,t);playSyllable(STEPS,t+tokenCache[1].duration+ISI);return true;}
 // ---------- Experiment flow ----------
 const MODS={rotation:ROTATION,phoneme:PHONEME};
 const screen=$('#screen'),hud=$('#hud'),main=$('#experiment');
-let results={},waitingStart=false,clockTimer=null,blockTimer=null;
+let results={},waitingStart=false,clockTimer=null,blockTimer=null,calTimer=null,headphonesOK=false;
+
+// Williams design for 5 conditions: 10 orders in which every condition appears in every position
+// equally often and follows every other condition equally often. Row = participant number mod 10.
+const WILLIAMS=(function(){const base=[0,1,4,2,3],rows=[];for(let k=0;k<5;k++){const r=base.map(x=>(x+k)%5);rows.push(r);rows.push(r.slice().reverse());}return rows;})();
 
 function showSetup(){
   screen.innerHTML=`
     <div class="kicker">Experimenter setup</div>
     <h1>Tetris dual-task experiment</h1>
-    <p>Runs every condition in one session: Tetris only, mental rotation only, phoneme discrimination only, Tetris + mental rotation, and Tetris + phoneme discrimination. One CSV downloads at the very end.</p>
+    <p>Practice (with Tetris speed calibration and accuracy criteria), then five blocks: Tetris only, mental rotation only, phoneme discrimination only, Tetris + mental rotation, and Tetris + phoneme discrimination. One CSV downloads at the very end.</p>
     <div class="form">
-      <label>Participant ID<input id="f_pid" autocomplete="off"></label>
+      <label>Participant ID (include a number)<input id="f_pid" autocomplete="off" placeholder="e.g. P07"></label>
       <label>Block order<select id="f_order">
+        <option value="latin">Counterbalanced (Latin square by participant number)</option>
         <option value="singles_first">Single tasks first, then dual tasks (each randomized)</option>
         <option value="random">Fully randomized</option>
         <option value="fixed">Fixed (as listed above)</option></select></label>
       <label>Block duration (s)<input id="f_block" type="number" value="180" min="10" max="1800"></label>
-      <label>Practice per task (s, 0 = none)<input id="f_practice" type="number" value="45" min="0" max="600"></label>
-      <label>Tetris drop interval (ms)<input id="f_drop" type="number" value="400" min="100" max="2000" step="50"></label>
+      <label>Practice per task (s, 0 = none)<input id="f_practice" type="number" value="90" min="0" max="600"></label>
+      <label>Tetris drop interval, start value (ms)<input id="f_drop" type="number" value="650" min="300" max="1000" step="50"></label>
+      <label>Calibrate Tetris speed in practice<select id="f_calib"><option value="1">Yes</option><option value="0">No (use start value)</option></select></label>
       <label>Mental rotation window (s)<input id="f_mr" type="number" value="6" min="1" max="15" step="0.5"></label>
       <label>Phoneme response window (s)<input id="f_aud" type="number" value="2" min="0.5" max="10" step="0.5"></label>
+      <label>Phoneme step difference (main blocks)<select id="f_step"><option value="2">2 steps (harder)</option><option value="3" selected>3 steps</option><option value="4">4 steps (easier)</option></select></label>
+      <label>Practice accuracy criterion (%)<input id="f_crit" type="number" value="75" min="0" max="100"></label>
+      <label>Max practice attempts per task<input id="f_att" type="number" value="3" min="1" max="10"></label>
     </div>
     <p class="hint" id="stimStatus"></p>
     <div id="formMsg"></div>
     <button id="startExp">Start experiment</button> &nbsp; <button class="alt" id="testSound">Play test sound</button>
-    <p class="hint" style="margin-top:14px">Practice blocks run each task alone and are marked <code>practice = 1</code> in the CSV. Keep this tab open until the end; closing it loses the data.</p>`;
+    <p class="hint" style="margin-top:14px">Practice blocks are marked <code>practice = 1</code> in the CSV. Keep this tab open until the end; closing it loses the data.</p>`;
   screen.classList.remove('hidden');hud.classList.add('hidden');main.classList.add('hidden');
-  $('#testSound').onclick=()=>{if(!ensureAudio()){$('#formMsg').textContent=stimStatus==='loading'?'The sound files are still loading.':'Sound files could not be loaded.';return;}{const t=audioContext.currentTime+.05;playSyllable(1,t);playSyllable(STEPS,t+tokenCache[1].duration+ISI);}};
+  $('#testSound').onclick=()=>{if(!playTestSounds())$('#formMsg').textContent=stimStatus==='loading'?'The sound files are still loading.':'Sound files could not be loaded.';};
   $('#startExp').onclick=startExperiment;
   updateStimStatus();
 }
@@ -366,48 +438,72 @@ function startExperiment(){
   const v=id=>Number($(id).value),msg=t=>{$('#formMsg').textContent=t;};
   const pid=$('#f_pid').value.trim();
   if(!pid)return msg('Enter a participant ID.');
-  const c={pid:pid,order:$('#f_order').value,blockMs:v('#f_block')*1000,practiceMs:v('#f_practice')*1000,dropMs:v('#f_drop'),mrWindow:v('#f_mr')*1000,audWindow:v('#f_aud')*1000};
+  const c={pid:pid,order:$('#f_order').value,blockMs:v('#f_block')*1000,practiceMs:v('#f_practice')*1000,dropMs:v('#f_drop'),startDropMs:v('#f_drop'),
+    calibrate:$('#f_calib').value==='1',mrWindow:v('#f_mr')*1000,audWindow:v('#f_aud')*1000,stepDiff:v('#f_step'),criterion:v('#f_crit'),maxAttempts:Math.max(1,v('#f_att'))};
   if(!(c.blockMs>=10000))return msg('Block duration must be at least 10 s.');
-  if(!(c.dropMs>=100&&c.dropMs<=2000))return msg('Drop interval must be 100–2000 ms.');
+  if(!(c.dropMs>=300&&c.dropMs<=1000))return msg('Drop interval must be 300–1000 ms.');
   if(!(c.mrWindow>=1000)||!(c.audWindow>=500))return msg('Check the response windows.');
   if(!ensureAudio())return msg(stimStatus==='loading'?'The sound files are still loading. Wait a moment and try again.':'The phoneme sounds are not available, so the experiment cannot start. '+stimError);
-  const order=c.order==='fixed'?SINGLE.concat(DUAL):c.order==='random'?shuffle(SINGLE.concat(DUAL)):shuffle(SINGLE).concat(shuffle(DUAL));
-  c.orderLabel=order.join('>');cfg=c;experimentStart=new Date();
+  let order,label;
+  if(c.order==='latin'){
+    const num=parseInt(pid.replace(/\D/g,''),10),row=isNaN(num)?Math.floor(Math.random()*10):num%10;
+    order=WILLIAMS[row].map(i=>ALL_CONDITIONS[i]);label='latin row '+row+(isNaN(num)?' (random: no number in ID)':'')+': '+order.join('>');
+  }else{
+    order=c.order==='fixed'?ALL_CONDITIONS.slice():c.order==='random'?shuffle(ALL_CONDITIONS):shuffle(SINGLE).concat(shuffle(DUAL));label=c.order+': '+order.join('>');
+  }
+  c.orderLabel=label;cfg=c;experimentStart=new Date();
   plan=[];
-  if(c.practiceMs>0)SINGLE.forEach(id=>plan.push({id:id,def:BLOCKS[id],practice:true,ms:c.practiceMs}));
+  if(c.practiceMs>0)['tetris_only','rotation_only','phoneme_only'].forEach(id=>plan.push({id:id,def:BLOCKS[id],practice:true,attempt:1,ms:c.practiceMs}));
   order.forEach(id=>plan.push({id:id,def:BLOCKS[id],practice:false,ms:c.blockMs}));
-  plan.forEach((b,i)=>{b.n=i+1;});
-  planIdx=0;showInstructions(false);
+  planIdx=0;showInstructions('');
 }
 function taskText(b){
   const d=b.def,items=[];
-  if(d.sec==='rotation')items.push(`<li><b>Mental rotation:</b> two 3D block objects appear. Press <kbd>S</kbd> if the right object is the <b>same</b> as the left one, just rotated. Press <kbd>D</kbd> if it is a <b>different</b>, mirror-image object. You have ${cfg.mrWindow/1000} s per pair.</li>`);
-  if(d.sec==='phoneme')items.push(`<li><b>Phoneme discrimination:</b> you will hear two syllables (like “ba” and “ga”). Press <kbd>S</kbd> if they sound the <b>same</b>, <kbd>D</kbd> if they sound <b>different</b>. You have ${cfg.audWindow/1000} s after the second syllable. Use headphones.</li>`);
-  if(d.tetris)items.push('<li><b>Tetris:</b> use the arrow keys to move and rotate pieces. Press <b>Space</b> to drop each piece as soon as you have decided where it goes. Clear as many lines as you can and avoid leaving gaps.</li>');
-  return '<ul>'+items.join('')+'</ul>'+(d.tetris&&d.sec?'<p><b>Both tasks are equally important.</b> Try to keep up your performance on both at the same time.</p>':'');
+  if(d.sec==='rotation')items.push(`<li><b>Mental rotation:</b> two 3D block objects appear. Press <kbd>S</kbd> if the right object is the <b>same</b> object as the left one, just turned. Press <kbd>D</kbd> if it is <b>different</b>: a mirror image, which can never be turned to match. Imagine rotating one object to line it up with the other. You have ${cfg.mrWindow/1000} s per pair.`+
+    (b.practice?` <br>This practice includes some easier pairs and tells you after each answer whether you were right.`:'')+`</li>`);
+  if(d.sec==='phoneme')items.push(`<li><b>Phoneme discrimination:</b> you will hear two syllables (like “ba” and “ga”). Press <kbd>S</kbd> if they sound exactly the <b>same</b>, <kbd>D</kbd> if they sound <b>different</b> in any way. You have ${cfg.audWindow/1000} s after the second syllable.`+
+    (b.practice?` <br>This practice uses pairs that are easier to tell apart and tells you after each answer whether you were right.`:'')+`</li>`);
+  if(d.tetris)items.push('<li><b>Tetris:</b> use the arrow keys to move and rotate pieces. Press <b>Space</b> to drop each piece as soon as you have decided where it goes. Clear as many lines as you can and avoid leaving gaps.'+
+    (b.practice&&cfg.calibrate?' <br>During this practice, the game speed adjusts to your play.':'')+'</li>');
+  let extra='';
+  if(b.practice&&d.sec)extra+=`<p>You need at least <b>${cfg.criterion}% correct</b> in this practice to move on.</p>`;
+  if(d.tetris&&d.sec)extra+='<p><b>Both tasks are equally important.</b> Try to keep up your performance on both at the same time.</p>';
+  return '<ul>'+items.join('')+'</ul>'+extra;
 }
-function showInstructions(afterBlock){
-  const b=plan[planIdx],nPractice=plan.filter(x=>x.practice).length,nMain=plan.length-nPractice;
-  const kicker=b.practice?`Practice ${b.n} of ${nPractice}`:`Block ${b.n-nPractice} of ${nMain}`;
-  const firstMain=!b.practice&&(planIdx===0||plan[planIdx-1].practice);
+function needsHeadphoneCheck(b){return b.def.sec==='phoneme'&&!headphonesOK;}
+function showInstructions(note){
+  const b=plan[planIdx],nMain=plan.filter(x=>!x.practice).length;
+  const mainIdx=plan.slice(0,planIdx+1).filter(x=>!x.practice).length;
+  const kicker=b.practice?'Practice'+(b.attempt>1?` (attempt ${b.attempt} of ${cfg.maxAttempts})`:''):`Block ${mainIdx} of ${nMain}`;
+  const firstMain=!b.practice&&planIdx>0&&plan[planIdx-1].practice;
+  const gate=needsHeadphoneCheck(b)?`<div class="gate"><p style="margin-top:0"><b>Headphone check.</b> Put on headphones, then play the sounds. You should hear two different syllables.</p>
+      <button class="alt" id="hpPlay">Play sounds</button>
+      <label style="margin-top:12px"><input type="checkbox" id="hpCheck"> I am wearing headphones, and I heard both syllables clearly.</label></div>`:'';
   screen.innerHTML=`
-    ${afterBlock?'<p><b style="color:var(--good)">Block complete.</b> Take a short break if you need one.</p>':''}
-    ${firstMain&&nPractice?'<p><b>Practice is over.</b> The real experiment starts now.</p>':''}
+    ${note?'<p>'+note+'</p>':''}
+    ${firstMain?'<p><b>Practice is over.</b> The real experiment starts now.</p>':''}
     <div class="kicker">${kicker}</div>
     <h1>${b.def.label}</h1>
     <p>This ${b.practice?'practice block':'block'} lasts ${fmtTime(b.ms)}.</p>
     ${taskText(b)}
+    ${gate}
     <button id="beginBlock">Start ${b.practice?'practice':'block'}</button> <span class="hint">&nbsp;or press Enter</span>`;
   screen.classList.remove('hidden');hud.classList.remove('hidden');main.classList.add('hidden');
   $('#hudBlock').textContent=kicker;$('#hudLabel').textContent='Up next: '+b.def.label;$('#timer').textContent=fmtTime(b.ms);
   waitingStart=true;$('#beginBlock').onclick=runBlock;
+  if(needsHeadphoneCheck(b)){
+    $('#beginBlock').disabled=true;
+    $('#hpPlay').onclick=function(){this.blur();playTestSounds();};
+    $('#hpCheck').onchange=function(){headphonesOK=this.checked;$('#beginBlock').disabled=!this.checked;
+      if(this.checked)allRows.push({participant:cfg.pid,experiment_start:experimentStart.toISOString(),order:cfg.orderLabel,row_type:'headphone_check_confirmed'});};
+  }
 }
 function runBlock(){
-  if(!waitingStart)return;waitingStart=false;
+  if(!waitingStart||needsHeadphoneCheck(plan[planIdx]))return;waitingStart=false;
   if(document.activeElement)document.activeElement.blur();
-  const b=plan[planIdx],d=b.def;
-  block=Object.assign({},b,{startPerf:performance.now(),endsAt:performance.now()+b.ms});
-  T={score:0,lines:0,pieces:0,gameOvers:0,holesCreated:0,placeSum:0,placeN:0,hard:0};
+  const b=plan[planIdx],d=b.def;blockCounter++;
+  block=Object.assign({},b,{n:blockCounter,startPerf:performance.now(),endsAt:performance.now()+b.ms});
+  T={score:0,lines:0,pieces:0,gameOvers:0,holesCreated:0,placeSum:0,placeN:0,hard:0,stackSum:0};
   sec={total:0,correct:0,misses:0,rtSum:0,rtN:0};
   ['#score','#lines','#overs'].forEach(s=>$(s).textContent='0');
   [mrUI,audUI].forEach(u=>{u.trial.textContent='0';u.acc.textContent='—';u.log.innerHTML='';u.feedback.textContent='';});
@@ -418,6 +514,7 @@ function runBlock(){
   $('#hudLabel').textContent=d.label+(b.practice?' (practice)':'');
   board=emptyBoard();piece=null;
   if(d.tetris){nextType=randType();spawn();tetrisOn=true;dropAt=performance.now();}
+  if(b.practice&&b.id==='tetris_only'&&cfg.calibrate){CAL={start:performance.now(),pieces:0,holes:0,maxStack:0,gameOver:false};calTimer=setInterval(()=>calibrationStep(CAL_WINDOW_MS),CAL_WINDOW_MS);}
   draw();
   if(d.sec)MODS[d.sec].start();
   blockTimer=setTimeout(()=>endBlock('completed'),b.ms);
@@ -426,35 +523,49 @@ function runBlock(){
 function endBlock(reason){
   if(!block)return;
   tetrisOn=false;if(block.def.sec)MODS[block.def.sec].stop();clearTimeout(blockTimer);clearInterval(clockTimer);
+  let note=reason==='completed'?'<b style="color:var(--good)">Block complete.</b> Take a short break if you need one.':'';
+  if(CAL){clearInterval(calTimer);const left=performance.now()-CAL.start;if(left>=15000)calibrationStep(left);CAL=null;
+    note=`<b style="color:var(--good)">Tetris practice complete.</b> The game speed is now set to <b>${cfg.dropMs} ms per row</b> for the rest of the experiment.`;}
   const d=block.def,el=performance.now()-block.startPerf;
   const S={
     lines_per_min:d.tetris?T.lines/(el/60000):null,
     holes_per_piece:d.tetris&&T.pieces?T.holesCreated/T.pieces:null,
+    mean_stack_height:d.tetris&&T.pieces?T.stackSum/T.pieces:null,
     mean_placement_ms:d.tetris&&T.placeN?T.placeSum/T.placeN:null,
     accuracy:d.sec&&sec.total?sec.correct/sec.total*100:null,
     rt:d.sec&&sec.rtN?sec.rtSum/sec.rtN:null};
   const r=(x,n)=>x===null?'':(+x.toFixed(n));
-  logRow('block_summary',{duration_s:r(el/1000,1),lines_per_min:r(S.lines_per_min,2),holes_per_piece:r(S.holes_per_piece,3),
+  let met='';
+  if(block.practice&&d.sec&&reason==='completed'){
+    const acc=sec.total?sec.correct/sec.total*100:0;met=acc>=cfg.criterion?1:0;
+    if(!met&&block.attempt<cfg.maxAttempts){
+      plan.splice(planIdx+1,0,Object.assign({},plan[planIdx],{attempt:block.attempt+1}));
+      note=`Practice accuracy: <b>${Math.round(acc)}%</b>. You need at least ${cfg.criterion}% to continue, so let’s practice once more. Take your time and think about each pair.`;
+    }else if(!met){note=`Practice accuracy: <b>${Math.round(acc)}%</b>. We’ll continue to the next part of the experiment.`;}
+    else note=`<b style="color:var(--good)">Practice complete:</b> ${Math.round(acc)}% correct.`;
+  }
+  logRow('block_summary',{duration_s:r(el/1000,1),lines_per_min:r(S.lines_per_min,2),holes_per_piece:r(S.holes_per_piece,3),mean_stack_height:r(S.mean_stack_height,2),
     mean_placement_ms:r(S.mean_placement_ms,0),hard_drop_pct:d.tetris&&T.pieces?+(T.hard/T.pieces*100).toFixed(1):'',
     secondary_trials:d.sec?sec.total:'',secondary_accuracy_pct:r(S.accuracy,1),secondary_misses:d.sec?sec.misses:'',
-    secondary_mean_rt_correct_ms:r(S.rt,0),ended:reason});
+    secondary_mean_rt_correct_ms:r(S.rt,0),criterion_met:met,ended:reason});
   if(!block.practice&&reason==='completed')results[block.id]=S;
   block=null;board=emptyBoard();piece=null;draw();
   planIdx++;
-  if(reason==='aborted'||planIdx>=plan.length)finish(reason==='aborted');else showInstructions(true);
+  if(reason==='aborted'||planIdx>=plan.length)finish(reason==='aborted');else showInstructions(note);
 }
-// Dual-task decrement: positive = worse under dual-task conditions.
+// Dual-task decrement. difference = dual − alone (raw units); decrement_pct is positive when performance is worse under the dual task.
 function decrements(){
   const out=[],add=(comp,label,single,dual,higherBetter)=>{
     if(single===null||single===undefined||dual===null||dual===undefined)return;
     const pct=single===0?'':+(((higherBetter?single-dual:dual-single)/single)*100).toFixed(1);
-    out.push({comparison:comp,measure:label,single_value:+single.toFixed(2),dual_value:+dual.toFixed(2),decrement_pct:pct});
+    out.push({comparison:comp,measure:label,single_value:+single.toFixed(2),dual_value:+dual.toFixed(2),difference:+(dual-single).toFixed(2),decrement_pct:pct});
   };
   [['tetris_rotation','rotation_only','mental rotation'],['tetris_phoneme','phoneme_only','phoneme discrimination']].forEach(([dual,single,name])=>{
     const D=results[dual],TS=results.tetris_only,SS=results[single];if(!D)return;
     const comp='Tetris + '+name;
-    if(TS){add(comp,'Tetris lines per minute',TS.lines_per_min,D.lines_per_min,true);
-      add(comp,'Tetris holes per piece',TS.holes_per_piece,D.holes_per_piece,false);
+    if(TS){add(comp,'Tetris holes per piece',TS.holes_per_piece,D.holes_per_piece,false);
+      add(comp,'Tetris mean stack height (rows)',TS.mean_stack_height,D.mean_stack_height,false);
+      add(comp,'Tetris lines per minute',TS.lines_per_min,D.lines_per_min,true);
       add(comp,'Tetris placement time (ms)',TS.mean_placement_ms,D.mean_placement_ms,false);}
     if(SS){add(comp,name+' accuracy (%)',SS.accuracy,D.accuracy,true);
       add(comp,name+' RT, correct trials (ms)',SS.rt,D.rt,false);}
@@ -467,13 +578,13 @@ function finish(aborted){
   dec.forEach(x=>allRows.push(Object.assign({participant:cfg.pid,experiment_start:experimentStart.toISOString(),order:cfg.orderLabel,row_type:'decrement'},x)));
   downloadCSV();
   hud.classList.add('hidden');main.classList.add('hidden');
-  const rows=dec.map(x=>`<tr><td>${x.comparison}</td><td>${x.measure}</td><td class="num">${x.single_value}</td><td class="num">${x.dual_value}</td><td class="num">${x.decrement_pct===''?'—':x.decrement_pct+'%'}</td></tr>`).join('');
+  const rows=dec.map(x=>`<tr><td>${x.comparison}</td><td>${x.measure}</td><td class="num">${x.single_value}</td><td class="num">${x.dual_value}</td><td class="num">${x.difference>0?'+':''}${x.difference}</td><td class="num">${x.decrement_pct===''?'—':x.decrement_pct+'%'}</td></tr>`).join('');
   screen.innerHTML=`
     <div class="kicker">${aborted?'Experiment ended early':'Experiment complete'}</div>
     <h1>Thank you!</h1>
-    <p>The data file <b>dualtask_${cfg.pid.replace(/[^\w-]/g,'_')}_${stamp(experimentStart)}.csv</b> has been downloaded.</p>
-    ${dec.length?`<h2>Dual-task decrement</h2><p class="hint">Positive values mean worse performance under the dual task than alone.</p>
-      <table><tr><th>Condition</th><th>Measure</th><th>Alone</th><th>Dual</th><th>Decrement</th></tr>${rows}</table>`:''}
+    <p>The data file <b>${csvName()}</b> has been downloaded. Tetris speed used: ${cfg.dropMs} ms per row.</p>
+    ${dec.length?`<h2>Dual-task decrement</h2><p class="hint">Difference = dual − alone. Decrement % is positive when performance is worse under the dual task (blank when the alone value is 0).</p>
+      <table><tr><th>Condition</th><th>Measure</th><th>Alone</th><th>Dual</th><th>Difference</th><th>Decrement</th></tr>${rows}</table>`:''}
     <button id="again">Download CSV again</button>`;
   screen.classList.remove('hidden');
   $('#again').onclick=downloadCSV;
