@@ -1,0 +1,494 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Tetris Dual-Task Experiment</title>
+<style>
+:root{--bg:#101522;--panel:#1a2132;--line:#34405a;--text:#f5f7fb;--muted:#aeb9cc;--accent:#64d8ff;--good:#75e5a5;--bad:#ff8792}
+*{box-sizing:border-box}
+body{margin:0;min-height:100vh;background:var(--bg);color:var(--text);font:16px/1.45 system-ui,sans-serif;display:flex;flex-direction:column;align-items:center}
+.hidden{display:none!important}
+.screen{width:min(760px,94vw);margin:48px 0;padding:32px;border:1px solid var(--line);border-radius:16px;background:var(--panel)}
+.screen h1{margin:0 0 6px;font-size:1.6rem}.screen h2{margin:22px 0 8px;font-size:1.1rem}.screen p,.screen li{color:var(--muted)}.screen p{margin:0 0 12px}
+.screen .kicker{color:var(--accent);font-weight:700;font-size:.85rem;text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px}
+.form{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:14px;margin:18px 0}
+.form label{display:flex;flex-direction:column;gap:5px;font-size:.85rem;color:var(--muted)}
+.form input,.form select{padding:9px;border:1px solid var(--line);border-radius:8px;background:#111827;color:var(--text);font:inherit}
+.hint{font-size:.85rem;color:var(--muted)}#formMsg{color:var(--bad);min-height:1.3em;margin:4px 0 10px}
+table{border-collapse:collapse;width:100%;margin:10px 0 16px;font-size:.9rem}th,td{padding:7px 9px;border-bottom:1px solid var(--line);text-align:left}th{color:var(--muted);font-weight:600}td.num{text-align:right;font-variant-numeric:tabular-nums}
+.hud{width:min(1180px,96vw);display:flex;align-items:center;gap:18px;margin-top:16px;padding:10px 18px;border:1px solid var(--line);border-radius:12px;background:var(--panel)}
+.hud .clock{margin-left:auto;font-size:1.1rem}.hud b{color:var(--accent);font-variant-numeric:tabular-nums}
+.experiment{display:grid;gap:20px;padding:16px 0 24px}
+.panel{min-height:640px;padding:24px;border:1px solid var(--line);border-radius:16px;background:var(--panel)}
+.panel h1{font-size:1.25rem;margin:0 0 8px}.panel p{color:var(--muted);margin:0 0 16px}
+.status{display:flex;justify-content:space-between;padding:12px;margin-bottom:16px;border-radius:9px;background:#111827}
+.response{text-align:center;font-weight:700;font-size:1.05rem;margin:14px 0}
+kbd{min-width:42px;padding:5px 10px;border:1px solid #6c7890;border-bottom-width:3px;border-radius:6px;background:#111827;color:#fff;font-weight:700}
+.feedback{min-height:24px;text-align:center;font-weight:700;color:var(--good)}
+.log{max-height:100px;overflow:auto;margin-top:16px;font:12px/1.3 ui-monospace,monospace;color:var(--muted)}
+button{cursor:pointer;border:0;border-radius:8px;padding:11px 18px;background:var(--accent);color:#07121b;font-weight:800;font-size:1rem}
+button.alt{background:transparent;color:var(--accent);border:1px solid var(--accent)}button.small{padding:6px 12px;font-size:.85rem}
+.game{display:flex;justify-content:center;align-items:flex-start;gap:16px}.side{min-width:120px}
+.score{font-size:1.5rem;font-weight:800;color:var(--accent);margin-bottom:8px}
+canvas{display:block;border:2px solid #60708f;background:#0d1320;image-rendering:pixelated}
+.stimuli{display:flex;align-items:center;justify-content:center;gap:20px;min-height:290px;margin:12px 0}
+.object{width:210px;height:250px;border:1px solid var(--line);border-radius:12px;background:#111827;image-rendering:auto}.equals{font-size:2rem;color:var(--muted)}
+.listen{min-height:245px;display:grid;place-items:center;margin:18px 0;border:1px dashed #53627f;border-radius:12px;background:#111827;text-align:center}
+.ear{font-size:4.4rem;line-height:1}.listen b{display:block;margin-top:14px;font-size:1.15rem}.listen span{color:var(--muted);font-size:.9rem}
+</style>
+</head>
+<body>
+<section class="screen" id="screen"></section>
+
+<div class="hud hidden" id="hud">
+  <span><b id="hudBlock"></b></span><span id="hudLabel"></span>
+  <span class="clock">Time <b id="timer">0:00</b></span>
+  <button class="alt small" id="abortBtn">End experiment</button>
+</div>
+
+<main class="experiment hidden" id="experiment">
+  <section class="panel" id="mrPanel" aria-label="Mental rotation">
+    <h1>3D Mental Rotation</h1>
+    <p>Is the right object the same as the left one rotated, or a different (mirror-image) object?</p>
+    <div class="status"><span>Trial <b id="mrTrial">0</b></span><span>Accuracy <b id="mrAcc">—</b></span></div>
+    <div class="stimuli"><canvas class="object" id="reference" width="420" height="500"></canvas><div class="equals">?</div><canvas class="object" id="comparison" width="420" height="500"></canvas></div>
+    <div class="response">Same object <kbd>S</kbd> &nbsp;•&nbsp; Different / mirror <kbd>D</kbd></div>
+    <div class="feedback" id="mrFeedback" aria-live="polite"></div>
+    <div class="log" id="mrLog"></div>
+  </section>
+  <section class="panel" id="audPanel" aria-label="Phoneme discrimination">
+    <h1>Phoneme Discrimination</h1>
+    <p>Hear two syllables and judge whether they are the same or different.</p>
+    <div class="status"><span>Trial <b id="audTrial">0</b></span><span>Accuracy <b id="audAcc">—</b></span></div>
+    <div class="listen"><div><div class="ear">◖</div><b id="soundStatus">Ready</b><span id="soundHint">Use headphones if available.</span></div></div>
+    <div class="response"><kbd>S</kbd>&nbsp; same &nbsp;&nbsp;&nbsp;&nbsp; <kbd>D</kbd>&nbsp; different</div>
+    <div class="feedback" id="audFeedback" aria-live="polite"></div>
+    <div class="log" id="audLog"></div>
+  </section>
+  <section class="panel" id="tetrisPanel" aria-label="Tetris">
+    <h1>Tetris</h1>
+    <p>Arrow keys: move/rotate &nbsp;•&nbsp; <b>Space: drop the piece once you’ve decided where it goes</b></p>
+    <div class="game"><canvas id="tetris" width="300" height="600" aria-label="Tetris board"></canvas>
+      <div class="side"><div>Score</div><div class="score" id="score">0</div><div>Lines</div><div class="score" id="lines">0</div><div>Game overs</div><div class="score" id="overs">0</div><div>Next</div><canvas id="next" width="120" height="120"></canvas></div></div>
+  </section>
+</main>
+<script>
+// =====================================================================================
+// Tetris dual-task experiment (Multiple Resource Theory)
+// Conditions: Tetris only, mental rotation only, phoneme discrimination only,
+// Tetris + mental rotation, Tetris + phoneme discrimination. One CSV at the end.
+// =====================================================================================
+const $=s=>document.querySelector(s);
+const BLOCKS={
+  tetris_only:      {label:'Tetris only',tetris:true,sec:null},
+  rotation_only:    {label:'Mental rotation only',tetris:false,sec:'rotation'},
+  phoneme_only:     {label:'Phoneme discrimination only',tetris:false,sec:'phoneme'},
+  tetris_rotation:  {label:'Tetris + mental rotation',tetris:true,sec:'rotation'},
+  tetris_phoneme:   {label:'Tetris + phoneme discrimination',tetris:true,sec:'phoneme'}
+};
+const SINGLE=['tetris_only','rotation_only','phoneme_only'],DUAL=['tetris_rotation','tetris_phoneme'];
+const CSV_COLUMNS=['participant','experiment_start','order','block_n','block','practice','row_type','t_ms','drop_ms','response_window_ms',
+  'trial','step_a','step_b','shape','angle_deg','axis','correct_answer','response','correct','rt_ms',
+  'piece_n','piece_type','first_action_ms','placement_ms','lock_ms','moves','rotations','soft_drops','hard_drop','lines_cleared','holes_created','holes_total','stack_height','score',
+  'tetris_lines_total','tetris_pieces_total','tetris_game_overs',
+  'duration_s','lines_per_min','holes_per_piece','mean_placement_ms','hard_drop_pct','secondary_trials','secondary_accuracy_pct','secondary_misses','secondary_mean_rt_correct_ms','ended',
+  'comparison','measure','single_value','dual_value','decrement_pct'];
+
+let cfg=null,plan=[],planIdx=-1,block=null,allRows=[],experimentStart=null,finished=false;
+let T,sec;
+const shuffle=a=>{a=a.slice();for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a;};
+const fmtTime=ms=>{const s=Math.ceil(Math.max(0,ms)/1000);return Math.floor(s/60)+':'+String(s%60).padStart(2,'0');};
+
+// ---------- Data ----------
+function baseRow(type){
+  const b=block;
+  return {participant:cfg.pid,experiment_start:experimentStart.toISOString(),order:cfg.orderLabel,block_n:b.n,block:b.id,practice:b.practice?1:0,
+    row_type:type,t_ms:Math.round(performance.now()-b.startPerf),drop_ms:b.def.tetris?cfg.dropMs:'',
+    response_window_ms:b.def.sec==='rotation'?cfg.mrWindow:b.def.sec==='phoneme'?cfg.audWindow:'',
+    tetris_lines_total:b.def.tetris?T.lines:'',tetris_pieces_total:b.def.tetris?T.pieces:'',tetris_game_overs:b.def.tetris?T.gameOvers:''};
+}
+function logRow(type,fields){if(block)allRows.push(Object.assign(baseRow(type),fields));}
+function recordSecondary(ui,fields){
+  if(!block)return;
+  sec.total++;if(fields.correct)sec.correct++;if(fields.response==='none')sec.misses++;
+  if(fields.correct&&fields.rt_ms!==null){sec.rtSum+=fields.rt_ms;sec.rtN++;}
+  ui.trial.textContent=sec.total;ui.acc.textContent=Math.round(sec.correct/sec.total*100)+'%';
+  logRow('secondary_trial',Object.assign({trial:sec.total},fields));
+}
+function csvCell(v){if(v===null||v===undefined)return '';v=String(v);return /[",\r\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v;}
+function stamp(d){const p=n=>String(n).padStart(2,'0');return d.getFullYear()+p(d.getMonth()+1)+p(d.getDate())+'-'+p(d.getHours())+p(d.getMinutes())+p(d.getSeconds());}
+function downloadCSV(){
+  const csv=[CSV_COLUMNS.join(',')].concat(allRows.map(r=>CSV_COLUMNS.map(c=>csvCell(r[c])).join(','))).join('\r\n');
+  const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));
+  a.download='dualtask_'+cfg.pid.replace(/[^\w-]/g,'_')+'_'+stamp(experimentStart)+'.csv';
+  document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),3000);
+}
+
+// ---------- Tetris ----------
+const COLS=10,ROWS=20,SIZE=30,PIECE_NAMES=['','I','J','L','O','S','Z','T'];
+const colors=['#000','#41d9ff','#558cff','#ffb75d','#ffe05b','#7ddd7a','#ff7884','#b27cff'];
+const PIECES=[[],[[1,1,1,1]],[[2,0,0],[2,2,2]],[[0,0,3],[3,3,3]],[[4,4],[4,4]],[[0,5,5],[5,5,0]],[[6,6,0],[0,6,6]],[[0,7,0],[7,7,7]]];
+const ctx=$('#tetris').getContext('2d'),nextCtx=$('#next').getContext('2d');
+let board=null,piece=null,nextType=1,tetrisOn=false,dropAt=0,pieceStats=null;
+const emptyBoard=()=>Array.from({length:ROWS},()=>Array(COLS).fill(0)),randType=()=>1+Math.floor(Math.random()*7);
+function collide(p){p=p||piece;return p.m.some((r,y)=>r.some((v,x)=>v&&(p.x+x<0||p.x+x>=COLS||p.y+y>=ROWS||(p.y+y>=0&&board[p.y+y][p.x+x]))));}
+// A hole = an empty cell with a filled cell somewhere above it in the same column.
+function countHoles(){let h=0;for(let x=0;x<COLS;x++){let covered=false;for(let y=0;y<ROWS;y++){if(board[y][x])covered=true;else if(covered)h++;}}return h;}
+function stackHeight(){for(let y=0;y<ROWS;y++)if(board[y].some(Boolean))return ROWS-y;return 0;}
+function spawn(){
+  const type=nextType;nextType=randType();
+  piece={type:type,m:PIECES[type].map(r=>r.slice()),x:3,y:0};
+  pieceStats={spawn:performance.now(),first:null,last:null,moves:0,rotations:0,soft:0};
+  if(collide()){T.gameOvers++;logRow('game_over',{score:T.score,stack_height:ROWS});board=emptyBoard();$('#overs').textContent=T.gameOvers;spawn();}
+}
+function lock(hard){
+  const before=countHoles();
+  piece.m.forEach((r,y)=>r.forEach((v,x)=>{if(v&&piece.y+y>=0)board[piece.y+y][piece.x+x]=v;}));
+  const created=Math.max(0,countHoles()-before);
+  let n=0;for(let y=ROWS-1;y>=0;y--)if(board[y].every(Boolean)){board.splice(y,1);board.unshift(Array(COLS).fill(0));n++;y++;}
+  const ps=pieceStats,lockMs=Math.round(performance.now()-ps.spawn),placement=ps.last===null?null:Math.round(ps.last-ps.spawn);
+  T.lines+=n;T.score+=[0,100,300,500,800][n];T.pieces++;T.holesCreated+=created;T.hard+=hard?1:0;
+  if(placement!==null){T.placeSum+=placement;T.placeN++;}
+  $('#score').textContent=T.score;$('#lines').textContent=T.lines;
+  logRow('tetris_piece',{piece_n:T.pieces,piece_type:PIECE_NAMES[piece.type],
+    first_action_ms:ps.first===null?'':Math.round(ps.first-ps.spawn),placement_ms:placement,lock_ms:lockMs,
+    moves:ps.moves,rotations:ps.rotations,soft_drops:ps.soft,hard_drop:hard?1:0,
+    lines_cleared:n,holes_created:created,holes_total:countHoles(),stack_height:stackHeight(),score:T.score});
+  spawn();
+}
+// placement_ms = spawn → last positioning keypress (move, rotate or hard drop): decision time without passive falling.
+function tetrisKey(k){
+  if(['ArrowLeft','ArrowRight','ArrowUp','ArrowDown',' '].indexOf(k)<0)return;
+  const t=performance.now();if(pieceStats.first===null)pieceStats.first=t;
+  if(k==='ArrowLeft'||k==='ArrowRight'){const d=k==='ArrowLeft'?-1:1;piece.x+=d;if(collide())piece.x-=d;else{pieceStats.moves++;pieceStats.last=t;}}
+  else if(k==='ArrowUp'){const old=piece.m;piece.m=old[0].map((_,i)=>old.map(r=>r[i]).reverse());if(collide())piece.m=old;else{pieceStats.rotations++;pieceStats.last=t;}}
+  else if(k==='ArrowDown'){piece.y++;if(collide())piece.y--;else pieceStats.soft++;}
+  else {pieceStats.last=t;while(!collide())piece.y++;piece.y--;lock(true);dropAt=performance.now();}
+  draw();
+}
+function drawBlock(c,x,y,v,s,ox,oy){c.fillStyle=colors[v];c.fillRect(ox+x*s+1,oy+y*s+1,s-2,s-2);}
+function draw(){
+  ctx.clearRect(0,0,300,600);nextCtx.clearRect(0,0,120,120);
+  if(board)board.forEach((r,y)=>r.forEach((v,x)=>v&&drawBlock(ctx,x,y,v,SIZE,0,0)));
+  if(tetrisOn&&piece){piece.m.forEach((r,y)=>r.forEach((v,x)=>v&&drawBlock(ctx,piece.x+x,piece.y+y,v,SIZE,0,0)));
+    PIECES[nextType].forEach((r,y)=>r.forEach((v,x)=>v&&drawBlock(nextCtx,x,y,v,24,18,18)));}
+}
+function loop(t){if(tetrisOn&&t-dropAt>cfg.dropMs){piece.y++;if(collide()){piece.y--;lock(false);}dropAt=t;draw();}requestAnimationFrame(loop);}
+requestAnimationFrame(loop);
+// ---------- Secondary task: 3D mental rotation (depth rotations of 80°, 120°, 160°) ----------
+const ANGLES=[80,120,160],MR_ITI=800;
+const reference=$('#reference'),comparison=$('#comparison');
+const mrUI={trial:$('#mrTrial'),acc:$('#mrAcc'),feedback:$('#mrFeedback'),log:$('#mrLog')};
+// Shepard–Metzler-style objects: 10 cubes in 4 arms bending through all three dimensions.
+// Each is checked to be chiral (its mirror image cannot be rotated to match it), so "different" trials are always truly different.
+const SHAPE_SPECS=[
+  [['+z',2],['+x',3],['+y',2],['+x',2]],
+  [['+x',2],['+y',3],['+z',2],['+y',2]],
+  [['+y',3],['+x',2],['+z',2],['+x',2]],
+  [['+x',3],['+z',2],['+y',2],['+z',2]],
+  [['+z',3],['+y',2],['+x',2],['+y',2]],
+  [['+x',2],['+z',2],['-y',3],['+x',2]]
+];
+function buildShape(spec){const cells=[[0,0,0]];let p=[0,0,0];spec.forEach(function(s){const i='xyz'.indexOf(s[0][1]),d=s[0][0]==='+'?1:-1;for(let k=0;k<s[1];k++){p=p.slice();p[i]+=d;cells.push(p)}});return cells}
+const rad=d=>d*Math.PI/180;
+function rotX(a){const c=Math.cos(a),s=Math.sin(a);return[[1,0,0],[0,c,-s],[0,s,c]]}
+function rotY(a){const c=Math.cos(a),s=Math.sin(a);return[[c,0,s],[0,1,0],[-s,0,c]]}
+function rotZ(a){const c=Math.cos(a),s=Math.sin(a);return[[c,-s,0],[s,c,0],[0,0,1]]}
+function mul(A,B){return A.map(r=>[0,1,2].map(j=>r[0]*B[0][j]+r[1]*B[1][j]+r[2]*B[2][j]))}
+function apply(M,v){return M.map(r=>r[0]*v[0]+r[1]*v[1]+r[2]*v[2])}
+// The 24 axis-aligned orientations of a cube.
+const CUBE_ROTS=(function(){const out=[],seen=new Set();for(let i=0;i<4;i++)for(let j=0;j<4;j++)for(let k=0;k<4;k++){const M=mul(rotX(rad(90*i)),mul(rotY(rad(90*j)),rotZ(rad(90*k)))).map(r=>r.map(Math.round)),key=JSON.stringify(M);if(!seen.has(key)){seen.add(key);out.push(M)}}return out})();
+function canon(cells){const mins=[0,1,2].map(i=>Math.min(...cells.map(c=>c[i])));return cells.map(c=>c.map((v,i)=>v-mins[i]).join(',')).sort().join(';')}
+function isChiral(cells){const m=canon(cells.map(([x,y,z])=>[-x,y,z]));return !CUBE_ROTS.some(R=>canon(cells.map(c=>apply(R,c).map(Math.round)))===m)}
+const shapes=SHAPE_SPECS.map(buildShape).filter(isChiral);
+// Fixed viewing angle (camera looks slightly down and from the side), mild perspective.
+const VIEW=mul(rotX(rad(22)),rotY(rad(-32))), CAM=14, LIGHT=(function(){const l=[-0.45,0.7,0.55],n=Math.hypot(...l);return l.map(v=>v/n)})();
+function renderObject(canvas,cells,M){
+  const c=canvas.getContext('2d'),W=canvas.width,H=canvas.height;
+  c.fillStyle='#111827';c.fillRect(0,0,W,H);
+  const n=cells.length,cen=[0,1,2].map(i=>cells.reduce((s,p)=>s+p[i],0)/n+0.5);
+  const key=p=>p.join(','),set=new Set(cells.map(key)),dirs=[[1,0,0],[-1,0,0],[0,1,0],[0,-1,0],[0,0,1],[0,0,-1]],faces=[];
+  let R=0;
+  cells.forEach(function(p){dirs.forEach(function(d){
+    if(set.has(key([p[0]+d[0],p[1]+d[1],p[2]+d[2]])))return;   // skip faces hidden between touching cubes
+    const ax=d.findIndex(v=>v!==0),u=(ax+1)%3,v=(ax+2)%3,off=d[ax]>0?1:0;
+    const pts=[[0,0],[1,0],[1,1],[0,1]].map(function(ab){const q=p.slice();q[ax]+=off;q[u]+=ab[0];q[v]+=ab[1];const w=apply(M,q.map((x,i)=>x-cen[i]));R=Math.max(R,Math.hypot(...w));return w});
+    faces.push({pts:pts,n:apply(M,d)});
+  })});
+  // Same object size on every trial regardless of orientation, so size is never a cue.
+  const scale=1.35*(Math.min(W,H)/2-24)/(R*CAM/(CAM-R));
+  const proj=q=>[W/2+q[0]*scale*CAM/(CAM-q[2]),H/2-q[1]*scale*CAM/(CAM-q[2])];
+  faces.forEach(function(f){f.c=[0,1,2].map(i=>(f.pts[0][i]+f.pts[1][i]+f.pts[2][i]+f.pts[3][i])/4);f.vis=f.n[0]*(-f.c[0])+f.n[1]*(-f.c[1])+f.n[2]*(CAM-f.c[2])>0;f.dist=Math.hypot(f.c[0],f.c[1],CAM-f.c[2])});
+  faces.filter(f=>f.vis).sort((a,b)=>b.dist-a.dist).forEach(function(f){
+    const diff=Math.max(0,f.n[0]*LIGHT[0]+f.n[1]*LIGHT[1]+f.n[2]*LIGHT[2]);
+    c.beginPath();f.pts.map(proj).forEach((q,i)=>i?c.lineTo(q[0],q[1]):c.moveTo(q[0],q[1]));c.closePath();
+    c.fillStyle='hsl(196,72%,'+(24+46*diff)+'%)';c.fill();
+    c.lineJoin='round';c.lineWidth=2.4;c.strokeStyle='#0a101c';c.stroke();
+  });
+}
+
+let rotationTrial=null,rotationTimeout=null,nextTrialTimeout=null;
+function blankObjects(){[reference,comparison].forEach(c=>{const g=c.getContext('2d');g.fillStyle='#111827';g.fillRect(0,0,c.width,c.height);});}
+function newRotationTrial(){
+  if(!block)return;
+  const si=Math.floor(Math.random()*shapes.length),shape=shapes[si],same=Math.random()<.5,base=CUBE_ROTS[Math.floor(Math.random()*CUBE_ROTS.length)];
+  const angle=ANGLES[Math.floor(Math.random()*ANGLES.length)],sign=Math.random()<.5?1:-1;
+  const Mref=mul(VIEW,base),Mcmp=mul(rotY(rad(sign*angle)),Mref);
+  renderObject(reference,shape,Mref);renderObject(comparison,same?shape:shape.map(([x,y,z])=>[-x,y,z]),Mcmp);
+  rotationTrial={same:same,shape:si+1,angle:angle,start:performance.now()};
+  mrUI.feedback.style.color='var(--good)';mrUI.feedback.textContent='Respond within '+cfg.mrWindow/1000+' s: S = same, D = different';
+  rotationTimeout=setTimeout(()=>answerRotation(null),cfg.mrWindow);
+}
+function answerRotation(isSame){
+  if(!rotationTrial)return;
+  clearTimeout(rotationTimeout);
+  const cur=rotationTrial;rotationTrial=null;
+  const ok=isSame!==null&&isSame===cur.same,rt=isSame===null?null:Math.round(performance.now()-cur.start);
+  recordSecondary(mrUI,{shape:cur.shape,angle_deg:cur.angle,axis:'depth',correct_answer:cur.same?'same':'different',response:isSame===null?'none':isSame?'same':'different',correct:ok?1:0,rt_ms:rt});
+  mrUI.feedback.style.color=ok?'var(--good)':'var(--bad)';
+  mrUI.feedback.textContent=isSame===null?'Time expired — no response':(ok?'Correct':'Incorrect')+' — '+rt+' ms';
+  mrUI.log.innerHTML='Trial '+sec.total+': '+(cur.same?'same':'different')+' | '+cur.angle+'° | '+(isSame===null?'miss':isSame?'same':'different')+' | '+(ok?'correct':'incorrect')+' | '+(rt===null?'—':rt+' ms')+'<br>'+mrUI.log.innerHTML;
+  nextTrialTimeout=setTimeout(newRotationTrial,MR_ITI);
+}
+const ROTATION={
+  ui:mrUI,
+  start(){newRotationTrial();},
+  stop(){clearTimeout(rotationTimeout);clearTimeout(nextTrialTimeout);rotationTrial=null;blankObjects();mrUI.feedback.textContent='';},
+  onKey(k){if(k==='s')answerRotation(true);else if(k==='d')answerRotation(false);}
+};
+blankObjects();
+// ---------- Secondary task: phoneme (AX) discrimination on a 7-step /ba/–/ga/ continuum ----------
+const STEPS=7,STEP_DIFF=2,ISI=0.4,AUD_ITI=1800;
+const soundStatus=$('#soundStatus'),soundHint=$('#soundHint');
+const audUI={trial:$('#audTrial'),acc:$('#audAcc'),feedback:$('#audFeedback'),log:$('#audLog')};
+let audioTrial=null,audioTimer=null,promptTimer=null;
+// Recorded /ba/–/ga/ continuum: STIM_FOLDER/step1.wav … step7.wav (step 1 = /ba/, step 7 = /ga/).
+// The files are loaded when the page opens; the experiment cannot start until all of them are ready.
+const STIM_FOLDER='stimuli';
+const tokenCache={};
+let stimStatus='loading',stimError='';
+const AudioCtx=window.AudioContext||window.webkitAudioContext;
+const audioContext=AudioCtx?new AudioCtx():null;
+function decodeWav(buf){return new Promise((res,rej)=>audioContext.decodeAudioData(buf,res,rej));}
+function updateStimStatus(){
+  const el=document.querySelector('#stimStatus');if(!el)return;
+  if(stimStatus==='ready'){el.textContent='✓ All '+STEPS+' sound files loaded from the “'+STIM_FOLDER+'” folder.';el.style.color='var(--good)';}
+  else if(stimStatus==='error'){el.textContent='Sound files could not be loaded: '+stimError;el.style.color='var(--bad)';}
+  else{el.textContent='Loading sound files…';el.style.color='var(--muted)';}
+}
+function loadStimuli(){
+  if(!audioContext){stimStatus='error';stimError='this browser does not support Web Audio.';updateStimStatus();return;}
+  if(location.protocol==='file:'){stimStatus='error';stimError='browsers block sound files when the page is opened directly from your computer. Open it from your GitHub Pages link instead.';updateStimStatus();return;}
+  const jobs=[];
+  for(let i=1;i<=STEPS;i++){
+    const url=STIM_FOLDER+'/step'+i+'.wav';
+    jobs.push(fetch(url).then(r=>{if(!r.ok)throw new Error(url+' not found (error '+r.status+'). Check that the “'+STIM_FOLDER+'” folder is uploaded next to this page.');return r.arrayBuffer();})
+      .then(decodeWav).then(b=>{tokenCache[i]=b;}));
+  }
+  Promise.all(jobs).then(()=>{stimStatus='ready';updateStimStatus();})
+    .catch(e=>{stimStatus='error';stimError=e&&e.message?e.message:String(e);updateStimStatus();});
+}
+// Returns true once the audio system is running and every sound file is loaded.
+function ensureAudio(){
+  if(!audioContext||stimStatus!=='ready')return false;
+  if(audioContext.state==='suspended')audioContext.resume();
+  return true;
+}
+function playSyllable(step,t){
+  const src=audioContext.createBufferSource(),g=audioContext.createGain();
+  src.buffer=tokenCache[step];g.gain.value=1;
+  src.connect(g);g.connect(audioContext.destination);src.start(t);
+}
+loadStimuli();
+function newAudioTrial(){
+  if(!block)return;
+  const same=Math.random()<.5,a=1+Math.floor(Math.random()*STEPS);let b=a;
+  if(!same){const o=[];if(a+STEP_DIFF<=STEPS)o.push(a+STEP_DIFF);if(a-STEP_DIFF>=1)o.push(a-STEP_DIFF);b=o[Math.floor(Math.random()*o.length)];}
+  const now=audioContext.currentTime,t1=now+.05,t2=t1+tokenCache[a].duration+ISI;
+  playSyllable(a,t1);playSyllable(b,t2);
+  const msToSecond=(t2-now)*1000;
+  audioTrial={a:a,b:b,answer:same?'same':'different',start:performance.now()+msToSecond}; // RT from second-syllable onset
+  soundStatus.textContent='Listen…';soundHint.textContent='Respond: S = same, D = different';
+  promptTimer=setTimeout(()=>{if(audioTrial){soundStatus.textContent='Same or different?';audUI.feedback.style.color='var(--good)';audUI.feedback.textContent='S = same     D = different';}},msToSecond+300);
+  audioTimer=setTimeout(()=>{if(audioTrial)answerAudio(null);},msToSecond+cfg.audWindow);
+}
+function answerAudio(response){
+  if(!audioTrial)return;
+  if(response&&performance.now()<audioTrial.start)return; // ignore presses before the second syllable
+  clearTimeout(audioTimer);clearTimeout(promptTimer);
+  const cur=audioTrial;audioTrial=null;
+  const ok=response===cur.answer,rt=response?Math.round(performance.now()-cur.start):null;
+  recordSecondary(audUI,{step_a:cur.a,step_b:cur.b,correct_answer:cur.answer,response:response||'none',correct:ok?1:0,rt_ms:rt});
+  audUI.feedback.style.color=ok?'var(--good)':'var(--bad)';
+  audUI.feedback.textContent=response?(ok?'Correct':'Incorrect')+' — '+rt+' ms':'Too slow — no response';
+  audUI.log.innerHTML='Trial '+sec.total+': steps '+cur.a+'–'+cur.b+' ('+cur.answer+') | '+(response||'miss')+' | '+(ok?'correct':'incorrect')+' | '+(rt===null?'—':rt+' ms')+'<br>'+audUI.log.innerHTML;
+  soundStatus.textContent='Waiting for next pair…';
+  audioTimer=setTimeout(newAudioTrial,AUD_ITI);
+}
+const PHONEME={
+  ui:audUI,
+  start(){newAudioTrial();},
+  stop(){clearTimeout(audioTimer);clearTimeout(promptTimer);audioTrial=null;soundStatus.textContent='Ready';soundHint.textContent='Use headphones if available.';audUI.feedback.textContent='';},
+  onKey(k){if(k==='s')answerAudio('same');else if(k==='d')answerAudio('different');}
+};
+// ---------- Experiment flow ----------
+const MODS={rotation:ROTATION,phoneme:PHONEME};
+const screen=$('#screen'),hud=$('#hud'),main=$('#experiment');
+let results={},waitingStart=false,clockTimer=null,blockTimer=null;
+
+function showSetup(){
+  screen.innerHTML=`
+    <div class="kicker">Experimenter setup</div>
+    <h1>Tetris dual-task experiment</h1>
+    <p>Runs every condition in one session: Tetris only, mental rotation only, phoneme discrimination only, Tetris + mental rotation, and Tetris + phoneme discrimination. One CSV downloads at the very end.</p>
+    <div class="form">
+      <label>Participant ID<input id="f_pid" autocomplete="off"></label>
+      <label>Block order<select id="f_order">
+        <option value="singles_first">Single tasks first, then dual tasks (each randomized)</option>
+        <option value="random">Fully randomized</option>
+        <option value="fixed">Fixed (as listed above)</option></select></label>
+      <label>Block duration (s)<input id="f_block" type="number" value="180" min="10" max="1800"></label>
+      <label>Practice per task (s, 0 = none)<input id="f_practice" type="number" value="45" min="0" max="600"></label>
+      <label>Tetris drop interval (ms)<input id="f_drop" type="number" value="400" min="100" max="2000" step="50"></label>
+      <label>Mental rotation window (s)<input id="f_mr" type="number" value="6" min="1" max="15" step="0.5"></label>
+      <label>Phoneme response window (s)<input id="f_aud" type="number" value="2" min="0.5" max="10" step="0.5"></label>
+    </div>
+    <p class="hint" id="stimStatus"></p>
+    <div id="formMsg"></div>
+    <button id="startExp">Start experiment</button> &nbsp; <button class="alt" id="testSound">Play test sound</button>
+    <p class="hint" style="margin-top:14px">Practice blocks run each task alone and are marked <code>practice = 1</code> in the CSV. Keep this tab open until the end; closing it loses the data.</p>`;
+  screen.classList.remove('hidden');hud.classList.add('hidden');main.classList.add('hidden');
+  $('#testSound').onclick=()=>{if(!ensureAudio()){$('#formMsg').textContent=stimStatus==='loading'?'The sound files are still loading.':'Sound files could not be loaded.';return;}{const t=audioContext.currentTime+.05;playSyllable(1,t);playSyllable(STEPS,t+tokenCache[1].duration+ISI);}};
+  $('#startExp').onclick=startExperiment;
+  updateStimStatus();
+}
+function startExperiment(){
+  const v=id=>Number($(id).value),msg=t=>{$('#formMsg').textContent=t;};
+  const pid=$('#f_pid').value.trim();
+  if(!pid)return msg('Enter a participant ID.');
+  const c={pid:pid,order:$('#f_order').value,blockMs:v('#f_block')*1000,practiceMs:v('#f_practice')*1000,dropMs:v('#f_drop'),mrWindow:v('#f_mr')*1000,audWindow:v('#f_aud')*1000};
+  if(!(c.blockMs>=10000))return msg('Block duration must be at least 10 s.');
+  if(!(c.dropMs>=100&&c.dropMs<=2000))return msg('Drop interval must be 100–2000 ms.');
+  if(!(c.mrWindow>=1000)||!(c.audWindow>=500))return msg('Check the response windows.');
+  if(!ensureAudio())return msg(stimStatus==='loading'?'The sound files are still loading. Wait a moment and try again.':'The phoneme sounds are not available, so the experiment cannot start. '+stimError);
+  const order=c.order==='fixed'?SINGLE.concat(DUAL):c.order==='random'?shuffle(SINGLE.concat(DUAL)):shuffle(SINGLE).concat(shuffle(DUAL));
+  c.orderLabel=order.join('>');cfg=c;experimentStart=new Date();
+  plan=[];
+  if(c.practiceMs>0)SINGLE.forEach(id=>plan.push({id:id,def:BLOCKS[id],practice:true,ms:c.practiceMs}));
+  order.forEach(id=>plan.push({id:id,def:BLOCKS[id],practice:false,ms:c.blockMs}));
+  plan.forEach((b,i)=>{b.n=i+1;});
+  planIdx=0;showInstructions(false);
+}
+function taskText(b){
+  const d=b.def,items=[];
+  if(d.sec==='rotation')items.push(`<li><b>Mental rotation:</b> two 3D block objects appear. Press <kbd>S</kbd> if the right object is the <b>same</b> as the left one, just rotated. Press <kbd>D</kbd> if it is a <b>different</b>, mirror-image object. You have ${cfg.mrWindow/1000} s per pair.</li>`);
+  if(d.sec==='phoneme')items.push(`<li><b>Phoneme discrimination:</b> you will hear two syllables (like “ba” and “ga”). Press <kbd>S</kbd> if they sound the <b>same</b>, <kbd>D</kbd> if they sound <b>different</b>. You have ${cfg.audWindow/1000} s after the second syllable. Use headphones.</li>`);
+  if(d.tetris)items.push('<li><b>Tetris:</b> use the arrow keys to move and rotate pieces. Press <b>Space</b> to drop each piece as soon as you have decided where it goes. Clear as many lines as you can and avoid leaving gaps.</li>');
+  return '<ul>'+items.join('')+'</ul>'+(d.tetris&&d.sec?'<p><b>Both tasks are equally important.</b> Try to keep up your performance on both at the same time.</p>':'');
+}
+function showInstructions(afterBlock){
+  const b=plan[planIdx],nPractice=plan.filter(x=>x.practice).length,nMain=plan.length-nPractice;
+  const kicker=b.practice?`Practice ${b.n} of ${nPractice}`:`Block ${b.n-nPractice} of ${nMain}`;
+  const firstMain=!b.practice&&(planIdx===0||plan[planIdx-1].practice);
+  screen.innerHTML=`
+    ${afterBlock?'<p><b style="color:var(--good)">Block complete.</b> Take a short break if you need one.</p>':''}
+    ${firstMain&&nPractice?'<p><b>Practice is over.</b> The real experiment starts now.</p>':''}
+    <div class="kicker">${kicker}</div>
+    <h1>${b.def.label}</h1>
+    <p>This ${b.practice?'practice block':'block'} lasts ${fmtTime(b.ms)}.</p>
+    ${taskText(b)}
+    <button id="beginBlock">Start ${b.practice?'practice':'block'}</button> <span class="hint">&nbsp;or press Enter</span>`;
+  screen.classList.remove('hidden');hud.classList.remove('hidden');main.classList.add('hidden');
+  $('#hudBlock').textContent=kicker;$('#hudLabel').textContent='Up next: '+b.def.label;$('#timer').textContent=fmtTime(b.ms);
+  waitingStart=true;$('#beginBlock').onclick=runBlock;
+}
+function runBlock(){
+  if(!waitingStart)return;waitingStart=false;
+  if(document.activeElement)document.activeElement.blur();
+  const b=plan[planIdx],d=b.def;
+  block=Object.assign({},b,{startPerf:performance.now(),endsAt:performance.now()+b.ms});
+  T={score:0,lines:0,pieces:0,gameOvers:0,holesCreated:0,placeSum:0,placeN:0,hard:0};
+  sec={total:0,correct:0,misses:0,rtSum:0,rtN:0};
+  ['#score','#lines','#overs'].forEach(s=>$(s).textContent='0');
+  [mrUI,audUI].forEach(u=>{u.trial.textContent='0';u.acc.textContent='—';u.log.innerHTML='';u.feedback.textContent='';});
+  $('#tetrisPanel').classList.toggle('hidden',!d.tetris);$('#mrPanel').classList.toggle('hidden',d.sec!=='rotation');$('#audPanel').classList.toggle('hidden',d.sec!=='phoneme');
+  const cols=(d.tetris?1:0)+(d.sec?1:0);
+  main.style.gridTemplateColumns=cols===2?'1fr 1fr':'1fr';main.style.width=cols===2?'min(1180px,96vw)':'min(620px,96vw)';
+  screen.classList.add('hidden');main.classList.remove('hidden');
+  $('#hudLabel').textContent=d.label+(b.practice?' (practice)':'');
+  board=emptyBoard();piece=null;
+  if(d.tetris){nextType=randType();spawn();tetrisOn=true;dropAt=performance.now();}
+  draw();
+  if(d.sec)MODS[d.sec].start();
+  blockTimer=setTimeout(()=>endBlock('completed'),b.ms);
+  clockTimer=setInterval(()=>{$('#timer').textContent=fmtTime(block?block.endsAt-performance.now():0);},250);
+}
+function endBlock(reason){
+  if(!block)return;
+  tetrisOn=false;if(block.def.sec)MODS[block.def.sec].stop();clearTimeout(blockTimer);clearInterval(clockTimer);
+  const d=block.def,el=performance.now()-block.startPerf;
+  const S={
+    lines_per_min:d.tetris?T.lines/(el/60000):null,
+    holes_per_piece:d.tetris&&T.pieces?T.holesCreated/T.pieces:null,
+    mean_placement_ms:d.tetris&&T.placeN?T.placeSum/T.placeN:null,
+    accuracy:d.sec&&sec.total?sec.correct/sec.total*100:null,
+    rt:d.sec&&sec.rtN?sec.rtSum/sec.rtN:null};
+  const r=(x,n)=>x===null?'':(+x.toFixed(n));
+  logRow('block_summary',{duration_s:r(el/1000,1),lines_per_min:r(S.lines_per_min,2),holes_per_piece:r(S.holes_per_piece,3),
+    mean_placement_ms:r(S.mean_placement_ms,0),hard_drop_pct:d.tetris&&T.pieces?+(T.hard/T.pieces*100).toFixed(1):'',
+    secondary_trials:d.sec?sec.total:'',secondary_accuracy_pct:r(S.accuracy,1),secondary_misses:d.sec?sec.misses:'',
+    secondary_mean_rt_correct_ms:r(S.rt,0),ended:reason});
+  if(!block.practice&&reason==='completed')results[block.id]=S;
+  block=null;board=emptyBoard();piece=null;draw();
+  planIdx++;
+  if(reason==='aborted'||planIdx>=plan.length)finish(reason==='aborted');else showInstructions(true);
+}
+// Dual-task decrement: positive = worse under dual-task conditions.
+function decrements(){
+  const out=[],add=(comp,label,single,dual,higherBetter)=>{
+    if(single===null||single===undefined||dual===null||dual===undefined)return;
+    const pct=single===0?'':+(((higherBetter?single-dual:dual-single)/single)*100).toFixed(1);
+    out.push({comparison:comp,measure:label,single_value:+single.toFixed(2),dual_value:+dual.toFixed(2),decrement_pct:pct});
+  };
+  [['tetris_rotation','rotation_only','mental rotation'],['tetris_phoneme','phoneme_only','phoneme discrimination']].forEach(([dual,single,name])=>{
+    const D=results[dual],TS=results.tetris_only,SS=results[single];if(!D)return;
+    const comp='Tetris + '+name;
+    if(TS){add(comp,'Tetris lines per minute',TS.lines_per_min,D.lines_per_min,true);
+      add(comp,'Tetris holes per piece',TS.holes_per_piece,D.holes_per_piece,false);
+      add(comp,'Tetris placement time (ms)',TS.mean_placement_ms,D.mean_placement_ms,false);}
+    if(SS){add(comp,name+' accuracy (%)',SS.accuracy,D.accuracy,true);
+      add(comp,name+' RT, correct trials (ms)',SS.rt,D.rt,false);}
+  });
+  return out;
+}
+function finish(aborted){
+  if(finished)return;finished=true;waitingStart=false;
+  const dec=decrements();
+  dec.forEach(x=>allRows.push(Object.assign({participant:cfg.pid,experiment_start:experimentStart.toISOString(),order:cfg.orderLabel,row_type:'decrement'},x)));
+  downloadCSV();
+  hud.classList.add('hidden');main.classList.add('hidden');
+  const rows=dec.map(x=>`<tr><td>${x.comparison}</td><td>${x.measure}</td><td class="num">${x.single_value}</td><td class="num">${x.dual_value}</td><td class="num">${x.decrement_pct===''?'—':x.decrement_pct+'%'}</td></tr>`).join('');
+  screen.innerHTML=`
+    <div class="kicker">${aborted?'Experiment ended early':'Experiment complete'}</div>
+    <h1>Thank you!</h1>
+    <p>The data file <b>dualtask_${cfg.pid.replace(/[^\w-]/g,'_')}_${stamp(experimentStart)}.csv</b> has been downloaded.</p>
+    ${dec.length?`<h2>Dual-task decrement</h2><p class="hint">Positive values mean worse performance under the dual task than alone.</p>
+      <table><tr><th>Condition</th><th>Measure</th><th>Alone</th><th>Dual</th><th>Decrement</th></tr>${rows}</table>`:''}
+    <button id="again">Download CSV again</button>`;
+  screen.classList.remove('hidden');
+  $('#again').onclick=downloadCSV;
+}
+$('#abortBtn').onclick=function(){this.blur();if(confirm('End the experiment now? The data collected so far will be downloaded.')){if(block)endBlock('aborted');else finish(true);}};
+window.addEventListener('beforeunload',e=>{if(cfg&&!finished){e.preventDefault();e.returnValue='';}});
+document.addEventListener('keydown',e=>{
+  const tag=e.target.tagName;if(tag==='INPUT'||tag==='SELECT')return;
+  if(!block){if(e.key==='Enter'&&waitingStart){e.preventDefault();runBlock();}return;}
+  if(['ArrowLeft','ArrowRight','ArrowUp','ArrowDown',' '].indexOf(e.key)>=0)e.preventDefault();
+  if(block.def.sec&&!e.repeat)MODS[block.def.sec].onKey(e.key.toLowerCase());
+  if(tetrisOn)tetrisKey(e.key);
+});
+showSetup();
+
+</script>
+</body>
+</html>
