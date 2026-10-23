@@ -115,6 +115,92 @@
     forwardKeys(tetrisWindow, rotationFrame, e => ['KeyS','KeyD'].includes(e.code) || ['s','d'].includes(e.key?.toLowerCase()));
   }
 
+
+  // Keep each mental-rotation pair on screen for a fixed six-second window.
+  // Responses are captured, then committed only when that window expires.
+  let rotationController = null;
+  let rotationEndTimer = null;
+  function installRotationTiming() {
+    const doc = rotationFrame.contentDocument;
+    if (!doc || rotationController) return;
+    const state = {running:false, ended:false, trialStarted:0, signature:'', response:null, timer:null, observer:null, stopTimer:null, committing:false};
+    rotationController = state;
+    const answerButtons = () => [...doc.querySelectorAll('button,[role="button"]')].filter(el => {
+      const text = `${el.id} ${el.className} ${el.textContent}`.toLowerCase();
+      return /same|different|identical|rotated|key.?s|key.?d/.test(text) && !el.disabled;
+    });
+    const answerFor = key => answerButtons().find(el => {
+      const text = `${el.id} ${el.className} ${el.textContent}`.toLowerCase();
+      return key === 's' ? /same|identical|key.?s/.test(text) : /different|rotated|key.?d/.test(text);
+    });
+    const stimulus = () => doc.querySelector('.stimulus-area,.stimulusArea,.stage,[id*="stimulus" i]') || doc.body;
+    const signature = () => {
+      const el = stimulus();
+      return `${el.innerHTML}|${el.querySelector?.('img')?.src || ''}|${el.querySelector?.('canvas')?.toDataURL?.() || ''}`;
+    };
+    const answerKey = el => {
+      const text = `${el.id} ${el.className} ${el.textContent}`.toLowerCase();
+      return /same|identical|key.?s/.test(text) ? 's' : 'd';
+    };
+    const commit = key => {
+      if (!key || state.committing || state.ended) return;
+      state.committing = true;
+      const button = answerFor(key);
+      if (button) button.click();
+      else doc.dispatchEvent(new KeyboardEvent('keydown',{key,code:key === 's' ? 'KeyS' : 'KeyD',bubbles:true,cancelable:true}));
+      state.committing = false;
+    };
+    const beginTrial = sig => {
+      if (!state.running || state.ended || !sig || sig === state.signature) return;
+      clearTimeout(state.timer);
+      state.signature = sig;
+      state.response = null;
+      state.trialStarted = performance.now();
+      state.timer = setTimeout(() => {
+        if (state.ended) return;
+        // A missing response is scored as an incorrect response. If the task
+        // exposes the correct answer in markup, choose the opposite; otherwise
+        // use D, matching the task's normal response path.
+        let key = state.response;
+        if (!key) {
+          const markedCorrect = answerButtons().find(el => /correct|answer|target/.test(`${el.dataset.correct} ${el.dataset.answer} ${el.getAttribute('aria-label') || ''}`.toLowerCase()));
+          key = markedCorrect ? (answerKey(markedCorrect) === 's' ? 'd' : 's') : 'd';
+        }
+        commit(key);
+      }, 6000);
+    };
+    const keyHandler = event => {
+      if (!state.running || state.ended || state.committing) return;
+      const key = event.key?.toLowerCase();
+      if (key !== 's' && key !== 'd') return;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      state.response = key;
+    };
+    const clickHandler = event => {
+      if (!state.running || state.ended || state.committing) return;
+      const button = event.target.closest?.('button,[role="button"]');
+      if (!button || !answerButtons().includes(button)) return;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      state.response = answerKey(button);
+    };
+    doc.addEventListener('keydown', keyHandler, true);
+    doc.addEventListener('click', clickHandler, true);
+    state.observer = new MutationObserver(() => beginTrial(signature()));
+    state.observer.observe(doc.body, {subtree:true, childList:true, characterData:true, attributes:true, attributeFilter:['src','class','style']});
+    state.start = () => { state.running = true; state.ended = false; state.signature = ''; setTimeout(() => beginTrial(signature()), 50); };
+    state.end = () => {
+      if (state.ended) return;
+      state.ended = true; state.running = false; clearTimeout(state.timer); state.observer?.disconnect();
+      doc.querySelectorAll('button,[role="button"]').forEach(el => { if (answerButtons().includes(el)) el.disabled = true; });
+      const finish = [...doc.querySelectorAll('button,a,[role="button"]')].find(el => /finish|end|complete|download results|save results/i.test(el.textContent || ''));
+      if (finish && !finish.disabled) finish.click();
+      const note = doc.createElement('div'); note.textContent = 'Mental rotation task ended after 3 minutes.';
+      note.style.cssText = 'position:fixed;inset:0;background:#101827eF;display:grid;place-items:center;color:white;font:700 22px system-ui;z-index:99999;';
+      doc.body.append(note);
+    };
+  }
   function loaded(name, frame, css) {
     const doc = frame.contentDocument;
     const expected = name === 'rotation' ? 'startBtn' : 'start';
@@ -127,6 +213,7 @@
     doc.head.append(style);
     ready[name] = true;
     installBridges();
+    if (name === 'rotation') installRotationTiming();
     if (ready.rotation && ready.tetris) {
       start.disabled = false;
       start.textContent = 'Start both tasks';
@@ -160,6 +247,9 @@
     t.getElementById('speed').value = speed;
     m.getElementById('startBtn').click();
     t.getElementById('start').click();
+    rotationController?.start();
+    clearTimeout(rotationEndTimer);
+    rotationEndTimer = setTimeout(() => rotationController?.end(), 180000);
     start.disabled = true;
     start.textContent = 'Tasks running';
     for (const input of document.querySelectorAll('.fields input')) input.disabled = true;
