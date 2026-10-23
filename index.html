@@ -201,22 +201,22 @@
 
   <script>
     // GitHub-hosted Kim et al. (2025) 10-cube stimuli.
-    // Recommended repository layout:
-    // stimuli/[10 cube] Rotations/A/A0.jpg
-    // stimuli/[10 cube] Mirrored Rotations/A_m/A0_m.jpg
-    // Change STIMULUS_ROOT if your folders are stored elsewhere.
+    // Expected repository layout beside index.html:
+    // stimuli/rotations/A/A0.jpg
+    // stimuli/mirrored/A/A0_m.jpg
     const STIMULUS_ROOT = 'stimuli';
-    const ROTATIONS_DIR = '[10 cube] Rotations';
-    const MIRRORED_DIR = '[10 cube] Mirrored Rotations';
-    const FIGURES = Array.from('ABCDEFGHIJKLMNO');
+    const ROTATIONS_DIR = 'rotations';
+    const MIRRORED_DIR = 'mirrored';
+    const FIGURES = Array.from('ABCDEFGHIJ');
     const ROTATION_INDICES = Array.from({ length: 15 }, (_, i) => i);
 
     function stimulusPath(kind, figure, rotationIndex) {
       const mirrored = kind === 'different';
       const directory = mirrored ? MIRRORED_DIR : ROTATIONS_DIR;
-      const folder = mirrored ? `${figure}_m` : figure;
       const suffix = mirrored ? '_m' : '';
-      return encodeURI(`${STIMULUS_ROOT}/${directory}/${folder}/${figure}${rotationIndex}${suffix}.jpg`);
+      return encodeURI(
+        `${STIMULUS_ROOT}/${directory}/${figure}/${figure}${rotationIndex}${suffix}.jpg`
+      );
     }
 
     const state = {
