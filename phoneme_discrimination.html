@@ -5,51 +5,207 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Phoneme Discrimination Task</title>
 <style>
-:root{color-scheme:dark;font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}*{box-sizing:border-box}body{margin:0;min-height:100vh;background:#0b1224;color:#eef4ff;display:grid;place-items:center;padding:24px}.card{width:min(760px,100%);background:#172139;border:1px solid #304264;border-radius:16px;padding:28px;box-shadow:0 16px 50px #0005}h1{margin:0 0 8px;font-size:28px}p{color:#b9c6dc;line-height:1.5}.hidden{display:none}.row{display:flex;gap:14px;align-items:end;flex-wrap:wrap}.field{flex:1;min-width:220px}label{display:block;color:#cbd7eb;font-size:14px;margin-bottom:6px}input{width:100%;padding:12px;border-radius:8px;border:1px solid #516789;background:#0d172c;color:#fff;font-size:16px}button{cursor:pointer;border:0;border-radius:9px;padding:13px 22px;background:#4e87ed;color:#fff;font-weight:700;font-size:16px}button:disabled{opacity:.4;cursor:not-allowed}.secondary{background:#263858}.responses{display:flex;gap:16px;justify-content:center;margin-top:28px}.response{min-width:190px;background:#168caf}.response.different{background:#40577f}.key{display:inline-grid;place-items:center;border:1px solid #b9c6dc;border-radius:5px;padding:1px 7px;margin-right:7px;font-family:monospace}.status{margin-top:22px;padding:12px;border-radius:8px;background:#0d172c;color:#cbd7eb;min-height:44px}.progress{height:9px;border-radius:99px;background:#0d172c;overflow:hidden;margin:18px 0}.bar{height:100%;width:0;background:#62d8df;transition:width .1s linear}.meta{display:flex;justify-content:space-between;color:#b9c6dc;font-size:14px}.center{text-align:center}.big{font-size:32px;font-weight:750;margin:34px 0 8px}.warning{color:#ffd166}
+:root{color-scheme:dark;font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}*{box-sizing:border-box}body{margin:0;min-height:100vh;background:#0b1224;color:#eef4ff;display:grid;place-items:center;padding:24px}.card{width:min(760px,100%);background:#172139;border:1px solid #304264;border-radius:14px;padding:22px}.hidden{display:none!important}h1{margin:0 0 8px;font-size:26px}p{color:#b9c7df;line-height:1.5}.grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}.field{display:flex;flex-direction:column;gap:6px}.field.full{grid-column:1/-1}label{font-weight:700;font-size:14px}input{background:#0e172c;color:#fff;border:1px solid #425579;border-radius:8px;padding:11px;font-size:16px}button{cursor:pointer;border:1px solid #5274a7;background:#243756;color:#fff;border-radius:8px;padding:11px 16px;font-weight:700}button.primary{background:#167eaa;border-color:#35c1e7}button:disabled{opacity:.5;cursor:not-allowed}.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}.status{margin-top:14px;padding:11px;border-radius:8px;background:#0e172c;color:#c9d7ee}.warning{color:#ffb4a8}.task-head{display:flex;justify-content:space-between;gap:12px;margin-bottom:12px;color:#c9d7ee}.bar-wrap{height:8px;background:#0e172c;border-radius:99px;overflow:hidden;margin-bottom:28px}.bar{height:100%;width:0;background:#73e5e5}.responses{display:flex;justify-content:center;gap:14px;margin-top:28px}.response{min-width:140px;font-size:16px}.response kbd{padding:2px 6px;border:1px solid #8ba2c4;border-radius:5px;margin-right:6px}.center{text-align:center}.small{font-size:13px;color:#9dafca}@media(max-width:600px){.grid{grid-template-columns:1fr}.field.full{grid-column:auto}}
 </style>
 </head>
 <body>
 <main class="card">
 <section id="setup">
-<h1>Phoneme Discrimination</h1>
-<p>Two speech sounds will play on each trial. Press <b>S</b> if they are the <b>same</b>, or <b>D</b> if they are <b>different</b>. Each trial lasts exactly 3 seconds. If you do not respond, the trial is scored incorrect and advances automatically. The task contains 60 trials and lasts exactly 3 minutes.</p>
-<div class="row"><div class="field"><label for="participant">Participant ID</label><input id="participant" autocomplete="off"></div><button id="start">Start task</button></div>
-<div id="loadStatus" class="status">Checking audio files…</div>
+<h1>Phoneme Discrimination Task</h1>
+<p>Decide whether the two sounds are the same or different. Press <b>S</b> for same and <b>D</b> for different. Each trial lasts 3 seconds; a response never starts the next trial early.</p>
+<div class="grid"><div class="field"><label for="participant">Participant ID</label><input id="participant" autocomplete="off"></div></div>
+<div id="loadStatus" class="status">Loading audio stimuli…</div>
+<div class="row" style="margin-top:14px"><button id="start" class="primary" disabled>Start task</button></div>
 </section>
 <section id="task" class="hidden">
-<div class="meta"><span>Trial <b id="trialNo">0</b> / 60</span><span>Accuracy: <b id="accuracy">—</b></span></div>
-<div class="progress"><div id="bar" class="bar"></div></div>
-<div class="center"><div class="big" id="playing">Ready</div><p>Press <span class="key">S</span>Same or <span class="key">D</span>Different</p></div>
-<div class="responses"><button class="response" data-response="same"><span class="key">S</span>Same</button><button class="response different" data-response="different"><span class="key">D</span>Different</button></div>
-<div id="taskStatus" class="status">Waiting to start…</div>
+<div class="task-head"><span>Trial <b id="trialNo">0</b> / 60</span><span>Accuracy: <b id="accuracy">—</b></span></div>
+<div class="bar-wrap"><div id="bar" class="bar"></div></div>
+<div class="center"><h2>Listen</h2><p id="taskStatus">Respond within 3 seconds.</p></div>
+<div class="responses"><button class="response" data-response="same"><kbd>S</kbd> Same</button><button class="response" data-response="different"><kbd>D</kbd> Different</button></div>
 </section>
-<section id="done" class="hidden center">
-<h1>Task complete</h1><p id="summary"></p><button id="download">Download CSV data</button> <button id="restart" class="secondary">Start over</button>
-</section>
+<section id="done" class="hidden center"><h1>Task complete</h1><p id="summary"></p><div class="row" style="justify-content:center"><button id="download" class="primary">Download CSV</button><button id="restart">Restart</button></div></section>
 </main>
 <script>
 'use strict';
-const TOTAL=60, TRIAL_MS=3000, TOTAL_MS=180000, AUDIO_GAP_MS=750;
-const audio={};let trials=[],results=[],trialIndex=-1,taskStart=0,trialTimer=null,finishTimer=null,responded=false,activeSources=[];
-const $=id=>document.getElementById(id);
-const shuffle=a=>{for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a};
-function buildTrials(){
- const same=[];for(let level=1;level<=7;level++)for(let n=0;n<4;n++)same.push({a:level,b:level,condition:'same'});
- const different=[];for(const [a,b] of [[1,4],[4,1],[2,5],[5,2],[3,6],[6,3],[4,7],[7,4]])for(let n=0;n<4;n++)different.push({a,b,condition:'different'});
- return shuffle(same.concat(different));
+
+const TOTAL = 60;
+const TRIAL_MS = 3000;
+const TOTAL_MS = TOTAL * TRIAL_MS;
+const AUDIO_GAP_MS = 750;
+const $ = id => document.getElementById(id);
+
+let audioContext = null;
+let audioBuffers = {};
+let trials = [];
+let results = [];
+let trialIndex = -1;
+let taskStart = 0;
+let trialTimer = null;
+let finishTimer = null;
+let responded = false;
+let activeSources = [];
+let taskToken = 0;
+
+function shuffle(array) {
+  for (let i = array.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [array[i], array[j]] = [array[j], array[i]];
+  }
+  return array;
 }
-async function preload(){
- const urls=[];for(let i=1;i<=7;i++)urls.push([i,`stimuli/step${i}.wav`]);
- try{await Promise.all(urls.map(async([i,url])=>{const r=await fetch(url,{cache:'no-cache'});if(!r.ok)throw new Error(`${url} (${r.status})`);const b=await r.arrayBuffer();const ctx=new (window.AudioContext||window.webkitAudioContext)();audio[i]=await ctx.decodeAudioData(b);audio[i].ctx=ctx}));$('loadStatus').textContent='All 7 audio stimuli are ready.';$('start').disabled=false}catch(e){$('loadStatus').innerHTML=`<span class="warning">Audio unavailable: ${e.message}</span><br>Place the <code>stimuli</code> folder beside this HTML file.`;$('start').disabled=true}}
-function stopActiveSources(){for(const src of activeSources){try{src.stop()}catch(e){}try{src.disconnect()}catch(e){}}activeSources=[]}
-function playSound(level,when){const x=audio[level],src=x.ctx.createBufferSource();src.buffer=x;src.connect(x.ctx.destination);activeSources.push(src);src.onended=()=>{activeSources=activeSources.filter(s=>s!==src)};src.start(when)}
-function playPair(t){stopActiveSources();const x=audio[t.a];const now=x.ctx.currentTime+.05;playSound(t.a,now);playSound(t.b,now+AUDIO_GAP_MS/1000)}
-function record(response,timeout=false){if(responded)return;responded=true;const t=trials[trialIndex],rt=performance.now()-(taskStart+trialIndex*TRIAL_MS);const correct=(response==='same')===(t.condition==='same');results.push({participant:$('participant').value.trim(),trial:trialIndex+1,first_level:t.a,second_level:t.b,condition:t.condition,response:response||'',correct:timeout?false:correct,timeout,rt_ms:timeout?'':Math.round(rt),trial_start_ms:Math.round(trialIndex*TRIAL_MS)});$('taskStatus').textContent=timeout?'No response — scored incorrect.':`${response==='same'?'Same':'Different'} response recorded.`;updateAccuracy()}
-function updateAccuracy(){const answered=results.filter(x=>x.response||x.timeout);const n=answered.length;if(!n){$('accuracy').textContent='—';return}$('accuracy').textContent=`${Math.round(100*answered.filter(x=>x.correct).length/n)}%`}
-function beginTrial(i){if(i>=TOTAL)return;trialIndex=i;responded=false;const t=trials[i];$('trialNo').textContent=i+1;$('playing').textContent='Listen';$('taskStatus').textContent='Respond within 3 seconds.';$('bar').style.width=`${((i*TRIAL_MS)/TOTAL_MS)*100}%`;playPair(t);clearTimeout(trialTimer);trialTimer=setTimeout(()=>{if(!responded)record('',true);if(i+1<TOTAL)beginTrial(i+1)},TRIAL_MS)}
-function finish(){clearTimeout(trialTimer);$('bar').style.width='100%';$('task').classList.add('hidden');$('done').classList.remove('hidden');const correct=results.filter(x=>x.correct).length;$('summary').textContent=`Completed 60 trials in exactly 3 minutes. Accuracy: ${correct}/${TOTAL} (${Math.round(100*correct/TOTAL)}%).`}
-function startTask(){if(!$('participant').value.trim()){alert('Enter a participant ID.');return}trials=buildTrials();results=[];trialIndex=-1;$('setup').classList.add('hidden');$('done').classList.add('hidden');$('task').classList.remove('hidden');taskStart=performance.now();beginTrial(0);clearTimeout(finishTimer);finishTimer=setTimeout(finish,TOTAL_MS)}
-function csv(){const cols=['participant','trial','first_level','second_level','condition','response','correct','timeout','rt_ms','trial_start_ms'];const lines=[cols.join(',')].concat(results.sort((a,b)=>a.trial-b.trial).map(r=>cols.map(c=>`"${String(r[c]??'').replaceAll('"','""')}"`).join(',')));return lines.join('\n')}
-$('start').disabled=true;preload();$('start').addEventListener('click',startTask);document.querySelectorAll('[data-response]').forEach(b=>b.addEventListener('click',()=>record(b.dataset.response)));document.addEventListener('keydown',e=>{if($('task').classList.contains('hidden')||e.repeat)return;const k=e.key.toLowerCase();if(k==='s'||k==='d'){e.preventDefault();record(k==='s'?'same':'different')}});$('download').addEventListener('click',()=>{const blob=new Blob([csv()],{type:'text/csv'}),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`phoneme_discrimination_${$('participant').value.trim()||'participant'}.csv`;a.click();URL.revokeObjectURL(a.href)});$('restart').addEventListener('click',()=>location.reload());
+
+function buildTrials() {
+  const same = [];
+  for (let level = 1; level <= 7; level++) {
+    for (let n = 0; n < 4; n++) same.push({a: level, b: level, condition: 'same'});
+  }
+  const different = [];
+  for (const [a, b] of [[1,4],[4,1],[2,5],[5,2],[3,6],[6,3],[4,7],[7,4]]) {
+    for (let n = 0; n < 4; n++) different.push({a, b, condition: 'different'});
+  }
+  return shuffle(same.concat(different));
+}
+
+async function preload() {
+  try {
+    const AudioCtor = window.AudioContext || window.webkitAudioContext;
+    if (!AudioCtor) throw new Error('Web Audio is not supported by this browser.');
+    audioContext = new AudioCtor();
+    for (let level = 1; level <= 7; level++) {
+      const url = `stimuli/step${level}.wav`;
+      const response = await fetch(url, {cache: 'no-cache'});
+      if (!response.ok) throw new Error(`${url} (${response.status})`);
+      const bytes = await response.arrayBuffer();
+      audioBuffers[level] = await audioContext.decodeAudioData(bytes);
+    }
+    $('loadStatus').textContent = 'All 7 audio stimuli are ready.';
+    $('start').disabled = false;
+  } catch (error) {
+    $('loadStatus').innerHTML = `<span class="warning">Audio unavailable: ${error.message}</span><br>Place the <code>stimuli</code> folder beside this HTML file.`;
+  }
+}
+
+function stopActiveSources() {
+  for (const source of activeSources) {
+    try { source.onended = null; source.stop(0); } catch (_) {}
+    try { source.disconnect(); } catch (_) {}
+  }
+  activeSources = [];
+}
+
+function playPair(trial) {
+  stopActiveSources();
+  const first = audioContext.createBufferSource();
+  const second = audioContext.createBufferSource();
+  first.buffer = audioBuffers[trial.a];
+  second.buffer = audioBuffers[trial.b];
+  first.connect(audioContext.destination);
+  second.connect(audioContext.destination);
+  activeSources = [first, second];
+  const startAt = audioContext.currentTime + 0.05;
+  first.start(startAt);
+  second.start(startAt + AUDIO_GAP_MS / 1000);
+}
+
+function record(response, timeout = false) {
+  if (responded || trialIndex < 0 || trialIndex >= TOTAL) return;
+  responded = true;
+  const trial = trials[trialIndex];
+  const rt = performance.now() - (taskStart + trialIndex * TRIAL_MS);
+  const correct = !timeout && ((response === 'same') === (trial.condition === 'same'));
+  results.push({
+    participant: $('participant').value.trim(),
+    trial: trialIndex + 1,
+    first_level: trial.a,
+    second_level: trial.b,
+    condition: trial.condition,
+    response: response || '',
+    correct,
+    timeout,
+    rt_ms: timeout ? '' : Math.round(rt),
+    trial_start_ms: trialIndex * TRIAL_MS
+  });
+  $('taskStatus').textContent = timeout ? 'No response — scored incorrect.' : `${response === 'same' ? 'Same' : 'Different'} response recorded.`;
+  updateAccuracy();
+}
+
+function updateAccuracy() {
+  if (!results.length) { $('accuracy').textContent = '—'; return; }
+  const correct = results.filter(item => item.correct).length;
+  $('accuracy').textContent = `${Math.round(100 * correct / results.length)}%`;
+}
+
+function beginTrial(index, token) {
+  if (token !== taskToken || index >= TOTAL) return;
+  trialIndex = index;
+  responded = false;
+  const trial = trials[index];
+  $('trialNo').textContent = index + 1;
+  $('taskStatus').textContent = 'Respond within 3 seconds.';
+  $('bar').style.width = `${(index / TOTAL) * 100}%`;
+  playPair(trial);
+
+  clearTimeout(trialTimer);
+  trialTimer = setTimeout(() => {
+    if (token !== taskToken) return;
+    if (!responded) record('', true);
+    if (index + 1 < TOTAL) beginTrial(index + 1, token);
+  }, TRIAL_MS);
+}
+
+function finish() {
+  clearTimeout(trialTimer);
+  stopActiveSources();
+  $('bar').style.width = '100%';
+  $('task').classList.add('hidden');
+  $('done').classList.remove('hidden');
+  const correct = results.filter(item => item.correct).length;
+  $('summary').textContent = `Completed ${TOTAL} trials in exactly 3 minutes. Accuracy: ${correct}/${TOTAL} (${Math.round(100 * correct / TOTAL)}%).`;
+}
+
+async function startTask() {
+  if (!$('participant').value.trim()) { alert('Enter a participant ID.'); return; }
+  await audioContext.resume();
+  clearTimeout(trialTimer);
+  clearTimeout(finishTimer);
+  stopActiveSources();
+  taskToken++;
+  const token = taskToken;
+  trials = buildTrials();
+  results = [];
+  trialIndex = -1;
+  responded = false;
+  $('setup').classList.add('hidden');
+  $('done').classList.add('hidden');
+  $('task').classList.remove('hidden');
+  taskStart = performance.now();
+  beginTrial(0, token);
+  finishTimer = setTimeout(() => { if (token === taskToken) finish(); }, TOTAL_MS);
+}
+
+function makeCsv() {
+  const columns = ['participant','trial','first_level','second_level','condition','response','correct','timeout','rt_ms','trial_start_ms'];
+  const rows = results.slice().sort((a,b) => a.trial - b.trial).map(row => columns.map(column => `"${String(row[column] ?? '').replaceAll('"','""')}"`).join(','));
+  return [columns.join(','), ...rows].join('\n');
+}
+
+preload();
+$('start').addEventListener('click', startTask);
+document.querySelectorAll('[data-response]').forEach(button => button.addEventListener('click', () => record(button.dataset.response)));
+document.addEventListener('keydown', event => {
+  if ($('task').classList.contains('hidden') || event.repeat) return;
+  const key = event.key.toLowerCase();
+  if (key === 's' || key === 'd') { event.preventDefault(); record(key === 's' ? 'same' : 'different'); }
+});
+$('download').addEventListener('click', () => {
+  const blob = new Blob([makeCsv()], {type: 'text/csv'});
+  const link = document.createElement('a');
+  link.href = URL.createObjectURL(blob);
+  link.download = `phoneme_discrimination_${$('participant').value.trim() || 'participant'}.csv`;
+  link.click();
+  setTimeout(() => URL.revokeObjectURL(link.href), 1000);
+});
+$('restart').addEventListener('click', () => location.reload());
 </script>
-</body></html>
+</body>
+</html>
