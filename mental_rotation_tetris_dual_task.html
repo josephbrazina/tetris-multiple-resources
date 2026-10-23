@@ -54,7 +54,6 @@
   </div>
 </main>
 <script>
-  // Both source pages must sit beside this file; their stimulus paths remain relative to this page.
   const taskFiles = {rotation:'index.html',tetris:'tetris_experiment.html'};
   const rotationFrame = document.getElementById('rotationFrame');
   const tetrisFrame = document.getElementById('tetrisFrame');
@@ -77,22 +76,45 @@
     @media(max-width:570px) { .layout { grid-template-columns:minmax(0,300px); justify-content:center; } }
   `;
   const ready = {rotation:false,tetris:false};
-  function forwardKeys(source, destination, predicate) {
-    source.addEventListener('keydown', event => {
+
+  // Forward real key events between same-origin frames. The previous version
+  // attached some listeners before the iframe documents existed and dispatched
+  // to document, which missed handlers attached to window/body.
+  function forwardKeys(sourceWindow, destinationFrame, predicate) {
+    sourceWindow.addEventListener('keydown', event => {
       if (!predicate(event)) return;
-      if (['INPUT','TEXTAREA','SELECT'].includes(event.target.tagName) || event.target.isContentEditable) return;
+      if (['INPUT','TEXTAREA','SELECT'].includes(event.target?.tagName) || event.target?.isContentEditable) return;
       if (event.code.startsWith('Arrow') || event.code === 'Space') event.preventDefault();
-      destination.contentDocument.dispatchEvent(new KeyboardEvent('keydown', {
-        key:event.key, code:event.code, repeat:event.repeat, bubbles:true, cancelable:true
+      const destination = destinationFrame.contentDocument;
+      if (!destination) return;
+      const target = destination.activeElement || destination.body || destination;
+      target.dispatchEvent(new KeyboardEvent('keydown', {
+        key:event.key, code:event.code, location:event.location,
+        repeat:event.repeat, bubbles:true, cancelable:true
       }));
     });
-    source.addEventListener('keyup', event => {
+    sourceWindow.addEventListener('keyup', event => {
       if (!predicate(event)) return;
-      destination.contentDocument.dispatchEvent(new KeyboardEvent('keyup', {
-        key:event.key, code:event.code, bubbles:true, cancelable:true
+      const destination = destinationFrame.contentDocument;
+      if (!destination) return;
+      const target = destination.activeElement || destination.body || destination;
+      target.dispatchEvent(new KeyboardEvent('keyup', {
+        key:event.key, code:event.code, location:event.location,
+        bubbles:true, cancelable:true
       }));
     });
   }
+
+  function installBridges() {
+    const rotationWindow = rotationFrame.contentWindow;
+    const tetrisWindow = tetrisFrame.contentWindow;
+    if (!rotationWindow || !tetrisWindow) return;
+    forwardKeys(window, tetrisFrame, e => ['ArrowLeft','ArrowRight','ArrowUp','ArrowDown','Space'].includes(e.code));
+    forwardKeys(window, rotationFrame, e => ['KeyS','KeyD'].includes(e.code) || ['s','d'].includes(e.key?.toLowerCase()));
+    forwardKeys(rotationWindow, tetrisFrame, e => ['ArrowLeft','ArrowRight','ArrowUp','ArrowDown','Space'].includes(e.code));
+    forwardKeys(tetrisWindow, rotationFrame, e => ['KeyS','KeyD'].includes(e.code) || ['s','d'].includes(e.key?.toLowerCase()));
+  }
+
   function loaded(name, frame, css) {
     const doc = frame.contentDocument;
     const expected = name === 'rotation' ? 'startBtn' : 'start';
@@ -103,12 +125,8 @@
     const style = doc.createElement('style');
     style.textContent = css;
     doc.head.append(style);
-    if (name === 'rotation') {
-      forwardKeys(doc, tetrisFrame.contentDocument, e => ['ArrowLeft','ArrowRight','ArrowUp','ArrowDown','Space'].includes(e.code));
-    } else {
-      forwardKeys(doc, rotationFrame.contentDocument, e => ['s','d'].includes(e.key.toLowerCase()));
-    }
     ready[name] = true;
+    installBridges();
     if (ready.rotation && ready.tetris) {
       start.disabled = false;
       start.textContent = 'Start both tasks';
@@ -119,8 +137,7 @@
   tetrisFrame.addEventListener('load', () => loaded('tetris',tetrisFrame,tetrisCss));
   rotationFrame.src = taskFiles.rotation;
   tetrisFrame.src = taskFiles.tetris;
-  forwardKeys(document, tetrisFrame.contentDocument, e => ['ArrowLeft','ArrowRight','ArrowUp','ArrowDown','Space'].includes(e.code));
-  forwardKeys(document, rotationFrame.contentDocument, e => ['s','d'].includes(e.key.toLowerCase()));
+
   start.addEventListener('click', () => {
     const $ = id => document.getElementById(id);
     const id = $('participant').value.trim();
@@ -141,7 +158,6 @@
     t.getElementById('participant').value = id;
     t.getElementById('order').value = order;
     t.getElementById('speed').value = speed;
-    // Both original Start handlers run in the same browser event turn.
     m.getElementById('startBtn').click();
     t.getElementById('start').click();
     start.disabled = true;
