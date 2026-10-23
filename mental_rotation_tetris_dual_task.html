@@ -54,8 +54,8 @@
   </div>
 </main>
 <script>
-  const rotationHTML = /*ROTATION_HTML*/;
-  const tetrisHTML = /*TETRIS_HTML*/;
+  // Both source pages must sit beside this file; their stimulus paths remain relative to this page.
+  const taskFiles = {rotation:'index.html',tetris:'tetris_experiment.html'};
   const rotationFrame = document.getElementById('rotationFrame');
   const tetrisFrame = document.getElementById('tetrisFrame');
   const start = document.getElementById('start');
@@ -77,10 +77,37 @@
     @media(max-width:570px) { .layout { grid-template-columns:minmax(0,300px); justify-content:center; } }
   `;
   const ready = {rotation:false,tetris:false};
+  function forwardKeys(source, destination, predicate) {
+    source.addEventListener('keydown', event => {
+      if (!predicate(event)) return;
+      if (['INPUT','TEXTAREA','SELECT'].includes(event.target.tagName) || event.target.isContentEditable) return;
+      if (event.code.startsWith('Arrow') || event.code === 'Space') event.preventDefault();
+      destination.contentDocument.dispatchEvent(new KeyboardEvent('keydown', {
+        key:event.key, code:event.code, repeat:event.repeat, bubbles:true, cancelable:true
+      }));
+    });
+    source.addEventListener('keyup', event => {
+      if (!predicate(event)) return;
+      destination.contentDocument.dispatchEvent(new KeyboardEvent('keyup', {
+        key:event.key, code:event.code, bubbles:true, cancelable:true
+      }));
+    });
+  }
   function loaded(name, frame, css) {
-    const style = frame.contentDocument.createElement('style');
+    const doc = frame.contentDocument;
+    const expected = name === 'rotation' ? 'startBtn' : 'start';
+    if (!doc?.getElementById(expected)) {
+      message.textContent = `Cannot load ${taskFiles[name]}. Commit that file alongside this page and push to GitHub.`;
+      return;
+    }
+    const style = doc.createElement('style');
     style.textContent = css;
-    frame.contentDocument.head.append(style);
+    doc.head.append(style);
+    if (name === 'rotation') {
+      forwardKeys(doc, tetrisFrame.contentDocument, e => ['ArrowLeft','ArrowRight','ArrowUp','ArrowDown','Space'].includes(e.code));
+    } else {
+      forwardKeys(doc, rotationFrame.contentDocument, e => ['s','d'].includes(e.key.toLowerCase()));
+    }
     ready[name] = true;
     if (ready.rotation && ready.tetris) {
       start.disabled = false;
@@ -90,8 +117,10 @@
   }
   rotationFrame.addEventListener('load', () => loaded('rotation',rotationFrame,rotationCss));
   tetrisFrame.addEventListener('load', () => loaded('tetris',tetrisFrame,tetrisCss));
-  rotationFrame.srcdoc = rotationHTML;
-  tetrisFrame.srcdoc = tetrisHTML;
+  rotationFrame.src = taskFiles.rotation;
+  tetrisFrame.src = taskFiles.tetris;
+  forwardKeys(document, tetrisFrame.contentDocument, e => ['ArrowLeft','ArrowRight','ArrowUp','ArrowDown','Space'].includes(e.code));
+  forwardKeys(document, rotationFrame.contentDocument, e => ['s','d'].includes(e.key.toLowerCase()));
   start.addEventListener('click', () => {
     const $ = id => document.getElementById(id);
     const id = $('participant').value.trim();
