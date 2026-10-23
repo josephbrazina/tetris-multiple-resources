@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Mental Rotation + Tetris | Dual Task</title>
+<style>
+  :root { font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; color-scheme:dark; color:#f4f8ff; background:#0d1424; }
+  * { box-sizing:border-box; }
+  body { margin:0; }
+  .shell { width:min(1840px,98%); margin:auto; padding:18px 0 32px; }
+  h1 { margin:0 0 4px; font-size:clamp(23px,2.7vw,34px); }
+  h2 { margin:0 0 10px; font-size:20px; }
+  p { margin:8px 0 0; color:#abbcd8; line-height:1.45; }
+  .setup { background:#18243b; border:1px solid #344363; border-radius:12px; padding:16px; margin:14px 0; }
+  .fields { display:grid; grid-template-columns:repeat(5,minmax(110px,1fr)) auto; gap:12px; align-items:end; }
+  label { display:block; color:#bdcce6; font-size:13px; }
+  input { width:100%; display:block; margin-top:5px; padding:10px; background:#0c1529; border:1px solid #536483; border-radius:8px; color:#fff; font:inherit; }
+  button { padding:11px 16px; border:0; border-radius:8px; background:#69d6ce; color:#10202d; font:inherit; font-weight:700; cursor:pointer; white-space:nowrap; }
+  button:disabled { opacity:.55; cursor:not-allowed; }
+  .columns { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:14px; align-items:start; }
+  .pane { min-width:0; background:#131d30; border:1px solid #344363; border-radius:12px; overflow:hidden; }
+  .pane-title { padding:12px 16px 0; font-weight:750; color:#d9e9ff; }
+  iframe { display:block; width:100%; height:850px; border:0; background:transparent; }
+  #message { min-height:21px; }
+  @media(max-width:1150px) { .fields { grid-template-columns:repeat(3,minmax(0,1fr)); } .columns { grid-template-columns:1fr; } }
+  @media(max-width:560px) { .fields { grid-template-columns:repeat(2,minmax(0,1fr)); } .fields button { grid-column:1/-1; } iframe { height:960px; } }
+</style>
+</head>
+<body>
+<main class="shell">
+  <h1>Mental Rotation + Tetris</h1>
+  <p>Dual-task condition: mental rotation on the left, Tetris on the right. One Start button begins both tasks together. Mental rotation keeps its own trial sequence; Tetris runs for exactly three minutes.</p>
+  <section class="setup" aria-label="Shared task setup">
+    <div class="fields">
+      <label>Participant ID<input id="participant" required autocomplete="off" placeholder="e.g., P001"></label>
+      <label>Mental rotation trials<input id="trials" type="number" min="4" max="200" value="40"></label>
+      <label>Practice trials<input id="practice" type="number" min="0" max="20" value="4"></label>
+      <label>Block order position<input id="order" type="number" min="1" step="1" value="1"></label>
+      <label>Gravity drop speed (ms/cell)<input id="speed" type="number" min="100" max="10000" step="1" value="800"></label>
+      <button id="start" disabled>Loading tasks…</button>
+    </div>
+    <p id="message" role="status">Loading both original tasks. The Tetris and mental rotation CSVs download separately, as in their solo versions.</p>
+  </section>
+  <div class="columns">
+    <section class="pane" aria-label="Mental rotation task">
+      <div class="pane-title">Mental rotation · S = same, D = different</div>
+      <iframe id="rotationFrame" title="Mental rotation task" scrolling="auto"></iframe>
+    </section>
+    <section class="pane" aria-label="Tetris task">
+      <div class="pane-title">Tetris · arrows + spacebar</div>
+      <iframe id="tetrisFrame" title="Tetris task" scrolling="auto"></iframe>
+    </section>
+  </div>
+</main>
+<script>
+  const rotationHTML = /*ROTATION_HTML*/;
+  const tetrisHTML = /*TETRIS_HTML*/;
+  const rotationFrame = document.getElementById('rotationFrame');
+  const tetrisFrame = document.getElementById('tetrisFrame');
+  const start = document.getElementById('start');
+  const message = document.getElementById('message');
+  const rotationCss = `
+    #setup, #restartBtn { display:none !important; }
+    .wrap { width: min(1100px, 98%); padding:16px 0 35px; }
+    .stimulus-area { grid-template-columns:minmax(0,1fr) 35px minmax(0,1fr); gap:6px; }
+    .stage { height:clamp(260px,28vw,350px); }
+    .response-row button { min-width:130px; }
+    @media(max-width:560px) { .stimulus-area {grid-template-columns:1fr;} .versus {display:none;} }
+  `;
+  const tetrisCss = `
+    body {display:block; min-height:0; padding:16px 8px 26px; }
+    .app { width:100%; }
+    .layout { grid-template-columns:minmax(0,300px) minmax(170px,1fr); gap:12px; }
+    .card { padding:11px; }
+    .fields label, #start { display:none !important; }
+    @media(max-width:570px) { .layout { grid-template-columns:minmax(0,300px); justify-content:center; } }
+  `;
+  const ready = {rotation:false,tetris:false};
+  function loaded(name, frame, css) {
+    const style = frame.contentDocument.createElement('style');
+    style.textContent = css;
+    frame.contentDocument.head.append(style);
+    ready[name] = true;
+    if (ready.rotation && ready.tetris) {
+      start.disabled = false;
+      start.textContent = 'Start both tasks';
+      message.textContent = 'Both tasks are ready. Download mental rotation results from the left panel and Tetris results from the right panel.';
+    }
+  }
+  rotationFrame.addEventListener('load', () => loaded('rotation',rotationFrame,rotationCss));
+  tetrisFrame.addEventListener('load', () => loaded('tetris',tetrisFrame,tetrisCss));
+  rotationFrame.srcdoc = rotationHTML;
+  tetrisFrame.srcdoc = tetrisHTML;
+  start.addEventListener('click', () => {
+    const $ = id => document.getElementById(id);
+    const id = $('participant').value.trim();
+    const order = Number($('order').value), speed = Number($('speed').value);
+    if (!id) { $('participant').reportValidity(); return; }
+    if (!Number.isSafeInteger(order) || order < 1 || !Number.isInteger(speed) || speed < 100 || speed > 10000) {
+      message.textContent = 'Enter a positive block order position and a gravity speed between 100 and 10000 ms/cell.';
+      return;
+    }
+    if (!$('trials').checkValidity() || !$('practice').checkValidity()) {
+      message.textContent = 'Check the mental rotation trial and practice counts.';
+      return;
+    }
+    const m = rotationFrame.contentDocument, t = tetrisFrame.contentDocument;
+    m.getElementById('participant').value = id;
+    m.getElementById('trialCount').value = $('trials').value;
+    m.getElementById('practiceCount').value = $('practice').value;
+    t.getElementById('participant').value = id;
+    t.getElementById('order').value = order;
+    t.getElementById('speed').value = speed;
+    // Both original Start handlers run in the same browser event turn.
+    m.getElementById('startBtn').click();
+    t.getElementById('start').click();
+    start.disabled = true;
+    start.textContent = 'Tasks running';
+    for (const input of document.querySelectorAll('.fields input')) input.disabled = true;
+    message.textContent = 'Both tasks started together. Mental rotation continues at your pace; Tetris ends automatically after three minutes. Download each task’s CSV from its own panel.';
+  });
+</script>
+</body>
+</html>
