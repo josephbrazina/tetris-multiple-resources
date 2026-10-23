@@ -6,9 +6,9 @@
 <title>Dual-Task Performance Experiment</title>
 <style>
 :root{--bg:#2f3338;--ink:#f1f5f9;--muted:#b8c0ca;--line:#4b5563;--accent:#5b8def;--dark:#111827;--panel:#3a4047;--good:#55d6a0;--bad:#ff8b84}
-*{box-sizing:border-box}html,body{margin:0;background:var(--bg);color:var(--ink);font:15px system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif}body{min-height:100vh}.screen{display:none;min-height:100vh;padding:28px}.screen.active{display:block}.card{max-width:1050px;margin:0 auto;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:24px;box-shadow:0 5px 20px #17202a0b}h1,h2{margin:0 0 14px}h1{font-size:25px}h2{font-size:20px}p{line-height:1.45}.muted{color:var(--muted)}.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px 20px}.field{display:flex;flex-direction:column;gap:5px}.field label{font-weight:650}.field small{font-weight:400;color:var(--muted)}input,select,button{font:inherit}input,select{padding:9px 10px;border:1px solid #687382;border-radius:7px;background:#252a30;color:var(--ink)}button{border:0;border-radius:7px;padding:10px 16px;background:var(--accent);color:#fff;font-weight:700;cursor:pointer}button.secondary{background:#59616d;color:#fff}button:disabled{opacity:.45;cursor:not-allowed}.actions{display:flex;gap:10px;align-items:center;margin-top:22px;flex-wrap:wrap}.status{padding:11px 13px;background:#252a30;border:1px solid var(--line);border-radius:8px;margin-top:16px}.ok{color:var(--good)}.error{color:var(--bad)}.full{grid-column:1/-1}.hidden{display:none!important}
+*{box-sizing:border-box}html,body{margin:0;background:var(--bg);color:var(--ink);font:15px system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif}body{min-height:100vh}.screen{display:none;min-height:100vh;padding:28px}.screen.active{display:block}.card{max-width:1050px;margin:0 auto;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:24px;box-shadow:0 5px 20px #17202a0b}h1,h2{margin:0 0 14px}h1{font-size:25px}h2{font-size:20px}p{line-height:1.45}.muted{color:var(--muted)}.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px 20px}.field{display:flex;flex-direction:column;gap:5px}.field label{font-weight:650}.field small{font-weight:400;color:var(--muted)}input,select,button{font:inherit}input,select{padding:9px 10px;border:1px solid #687382;border-radius:7px;background:#252a30;color:var(--ink)}button{border:0;border-radius:7px;padding:10px 16px;background:var(--accent);color:#fff;font-weight:700;cursor:pointer}button.secondary{background:#59616d;color:#fff}button:disabled{opacity:.45;cursor:not-allowed}.actions{display:flex;gap:10px;align-items:center;margin-top:22px;flex-wrap:wrap}.status{padding:11px 13px;background:#f0f3f7;border-radius:8px;margin-top:16px}.ok{color:var(--good)}.error{color:var(--bad)}.full{grid-column:1/-1}.hidden{display:none!important}
 #experiment{padding:14px;min-height:100vh}.expbar{max-width:1250px;margin:auto;display:flex;justify-content:space-between;align-items:center;gap:15px;padding:7px 2px;font-size:13px}.task-layout{max-width:1250px;margin:auto;display:grid;grid-template-columns:1fr 1fr;gap:18px;align-items:start;min-height:calc(100vh - 68px)}.task-layout.single{display:block}.task-panel{display:flex;justify-content:center;align-items:flex-start;min-height:520px}.task-panel.left{grid-column:1}.task-panel.right{grid-column:2}.task-panel.center{grid-column:1/-1}.panel-inner{text-align:center;width:min(100%,560px)}.instruction{color:var(--muted);margin:0 0 9px}.keyhint{font-size:13px;color:var(--muted);margin-top:9px}.feedback{height:24px;font-weight:700;margin-top:9px}.secondaryPanel canvas{background:#fff;border:1px solid var(--line);border-radius:10px;max-width:100%}.mr-canvas{width:500px;height:330px}.phoneme{padding-top:55px}.audio-status{font-size:13px;color:var(--muted);margin:15px}.trial-counter{font-variant-numeric:tabular-nums;color:var(--muted)}
-#tetrisCanvas{background:#101722;border:3px solid #263445;border-radius:6px;width:300px;height:600px;image-rendering:pixelated}.nextbox{margin:0 auto 10px;width:112px;height:70px;background:#101722;border:2px solid #263445;border-radius:6px}.tetris-wrap{display:flex;gap:18px;justify-content:center;align-items:flex-start}.next-label{font-size:12px;color:var(--muted);margin-bottom:4px}.metricline{font-size:13px;color:var(--muted);margin-top:8px}.calib-row{border-left:3px solid var(--accent);padding:7px 10px;margin:9px 0;background:#252a30;font-size:13px}.summary{width:100%;border-collapse:collapse;margin-top:16px;font-size:13px}.summary th,.summary td{border:1px solid var(--line);padding:8px;text-align:left}.summary th{background:#252a30}
+#tetrisCanvas{background:#101722;border:3px solid #263445;border-radius:6px;width:300px;height:600px;image-rendering:pixelated}.nextbox{margin:0 auto 10px;width:112px;height:70px;background:#101722;border:2px solid #263445;border-radius:6px}.tetris-wrap{display:flex;gap:18px;justify-content:center;align-items:flex-start}.next-label{font-size:12px;color:var(--muted);margin-bottom:4px}.metricline{font-size:13px;color:var(--muted);margin-top:8px}.calib-row{border-left:3px solid var(--accent);padding:7px 10px;margin:9px 0;background:#f4f7ff;font-size:13px}.summary{width:100%;border-collapse:collapse;margin-top:16px;font-size:13px}.summary th,.summary td{border:1px solid var(--line);padding:8px;text-align:left}.summary th{background:#f0f3f7}
 @media(max-width:780px){.grid{grid-template-columns:1fr}.task-layout{grid-template-columns:1fr}.task-panel.left,.task-panel.right{grid-column:1}.task-layout{min-height:auto}.screen{padding:15px}.tetris-wrap{gap:8px}}
 </style>
 </head>
@@ -28,7 +28,7 @@
 <div class="field"><label for="practiceAcc">Practice accuracy needed to move on</label><input id="practiceAcc" type="number" min="1" max="100" value="75">%</div>
 <div class="field"><label for="maxAttempts">Maximum practice attempts per task</label><input id="maxAttempts" type="number" min="1" value="3"></div>
 <div class="full status" id="trialStatus"></div>
-<div class="full status" id="soundStatus">Checking stimuli/step1.wav …</div>
+<div class="full status" id="soundStatus">Audio check starting…</div>
 </div>
 <div class="actions"><button id="startBtn">Start experiment</button><span class="muted">Use a keyboard and headphones for the phoneme task.</span></div>
 </div></section>
@@ -51,58 +51,56 @@ function shuffle(a){a=a.slice();for(let i=a.length-1;i>0;i--){let j=Math.floor(M
 function fmt(x){return Number.isFinite(x)?x.toFixed(3):''}
 function updateTrialStatus(){let sec=+$('blockSec').value||180, ph=Math.floor(sec/3), mr=Math.floor(sec/6);$('trialStatus').textContent=`Main-block schedule: phoneme: ${ph} pairs, one every 3 s; mental rotation: ${mr} pairs, one every 6 s.`}
 ['blockSec','phDiff','mrWindow','phWindow'].forEach(id=>$(id).addEventListener('input',updateTrialStatus));updateTrialStatus();
-function stimulusURL(n){return new URL(`./stimuli/step${n}.wav`,document.baseURI).href}
-function checkOneAudio(n){
-  return new Promise(resolve=>{
-    const url=stimulusURL(n), a=new Audio();
-    let settled=false;
-    const finish=ok=>{
-      if(settled)return;
-      settled=true;
-      a.oncanplaythrough=a.onerror=a.onloadeddata=null;
-      if(ok){a.preload='auto';audio[n]=a;}
-      resolve({ok,url});
-    };
-    a.preload='auto';
-    a.oncanplaythrough=()=>finish(true);
-    a.onloadeddata=()=>finish(true);
-    a.onerror=()=>finish(false);
-    a.src=url;
-    a.load();
-    setTimeout(()=>finish(false),5000);
-  });
-}
-async function checkAudio(){
-  const results=[];
-  for(let i=1;i<=7;i++) results.push(await checkOneAudio(i));
-  const good=results.filter(x=>x.ok).length;
-  const failed=results.filter(x=>!x.ok).map(x=>x.url);
-  if(good===7){
-    $('soundStatus').innerHTML='<span class="ok">All seven WAV files are available.</span>';
-  }else{
-    $('soundStatus').innerHTML=`<span class="error">${good}/7 WAV files detected.</span><br><small>Expected files at the GitHub Pages location next to this HTML file in <code>stimuli/</code>. You can still start; phoneme playback will report any missing file.</small>${failed.length?`<br><small>Not detected: ${failed.join(', ')}</small>`:''}`;
-  }
+const STIMULI_BASE=new URL('stimuli/',document.baseURI).href;
+function soundURL(n){return new URL(`step${n}.wav`,STIMULI_BASE).href}
+function loadAudio(n){return new Promise(resolve=>{
+  const a=new Audio();
+  a.preload='auto';
+  a.src=soundURL(n);
+  let done=false;
+  const finish=ok=>{if(done)return;done=true;clearTimeout(timer);a.removeEventListener('canplaythrough',onok);a.removeEventListener('loadedmetadata',onok);a.removeEventListener('error',onerror);resolve({ok,a})};
+  const onok=()=>finish(true), onerror=()=>finish(false);
+  const timer=setTimeout(()=>finish(false),4000);
+  a.addEventListener('canplaythrough',onok,{once:true});
+  a.addEventListener('loadedmetadata',onok,{once:true});
+  a.addEventListener('error',onerror,{once:true});
+  a.load();
+})}
+function checkAudio(){
+  const status=$('soundStatus');
+  status.innerHTML=`Checking <code>${STIMULI_BASE}step1.wav</code> … <small>(the experiment can start while this check runs)</small>`;
+  Promise.all(Array.from({length:7},(_,j)=>loadAudio(j+1)))
+    .then(results=>{
+      results.forEach((r,j)=>{if(r.ok)audio[j+1]=r.a});
+      const good=results.filter(r=>r.ok).length;
+      const missing=results.map((r,j)=>r.ok?'':`step${j+1}.wav`).filter(Boolean);
+      status.innerHTML=good===7
+        ? `<span class="ok">All seven sound files are available.</span><br><small>${STIMULI_BASE}</small>`
+        : `<span class="error">${good}/7 sound files detected.</span> Missing/unavailable: ${missing.join(', ')||'none'}.<br><small>Expected folder: ${STIMULI_BASE}</small><br><small>You can still start. If phoneme trials fail, check the exact filenames and GitHub Pages URL.</small>`;
+    })
+    .catch(err=>{
+      status.innerHTML=`<span class="error">Audio check failed, but the experiment can still start.</span><br><small>${STIMULI_BASE}</small>`;
+      console.warn('Stimulus check failed:',err);
+    });
 }
 checkAudio();
+
 function readCfg(){cfg={pid:$('pid').value.trim(),order:$('order').value,blockSec:+$('blockSec').value||180,practiceSec:+$('practiceSec').value||0,speed:clamp(+$('speed').value||650,300,1000),calibrate:$('calibrate').value==='yes',mrWindow:+$('mrWindow').value||6,phWindow:+$('phWindow').value||2,phDiff:+$('phDiff').value||3,practiceAcc:(+$('practiceAcc').value||75)/100,maxAttempts:+$('maxAttempts').value||3};}
 function orderBlocks(){let b=['tetris','mr','phoneme','tetris+mr','tetris+phoneme'];if(cfg.order==='fixed')return b;if(cfg.order==='singlesFirst')return ['tetris','mr','phoneme','tetris+mr','tetris+phoneme'];if(cfg.order==='random')return shuffle(b);let n=(cfg.pid.match(/\d+/)||['0'])[0],idx=+n%5;return b.slice(idx).concat(b.slice(0,idx));}
 $('startBtn').onclick=()=>{readCfg();if(!cfg.pid){alert('Participant ID is required.');return}if(cfg.order==='latin'&&!/\d/.test(cfg.pid)){alert('Counterbalanced Latin-square order requires a participant ID containing a number.');return}state={blockNo:0,blocks:orderBlocks(),tetrisSpeed:cfg.speed,practiceAttempts:{},practicePassed:{},metrics:{},mrTrials:[],phTrials:[]};beginIntro()};
 function beginIntro(){let b=state.blocks[state.blockNo];$('introTitle').textContent=`Block ${state.blockNo+1} of 5: ${b}`;$('introText').innerHTML=b==='tetris'?'Use L/R arrows to move, ↑ to rotate, ↓ to move down one row, and SPACE to hard drop. Press SPACE as soon as you have chosen a placement.':b==='mr'?'Two objects are shown. Press S if the right object is the same object turned; press D if it is a mirror image.':'Press S for same and D for different. For phoneme blocks, wear headphones and attend to the two sounds.';$('introExtra').innerHTML=(b==='phoneme'&&!state.headphones)?`<p><label><input type="checkbox" id="headphones"> I am wearing headphones and can hear the stimuli.</label></p><div class="audio-status"><button class="secondary" id="playExamples">Play example sounds</button> <span id="audioMsg"></span></div>`:'';$('introBtn').disabled=b==='phoneme'&&!state.headphones;$('introBtn').textContent=cfg.practiceSec?'Continue to practice':'Start block';show('introScreen');if(b==='phoneme'&&!state.headphones){$('headphones').onchange=e=>{$('introBtn').disabled=!e.target.checked;state.headphones=e.target.checked};$('playExamples').onclick=async()=>{await playSound(1);setTimeout(()=>playSound(7),500)}}}
 $('introBtn').onclick=()=>{if(cfg.practiceSec&&!state.practicePassed[state.blocks[state.blockNo]])runPractice();else startBlock()};
-function playSound(n){
-  return new Promise(resolve=>{
-    const url=stimulusURL(n);
-    let a=audio[n];
-    if(!a){a=new Audio(url);a.preload='auto';audio[n]=a;}
-    a.currentTime=0;
-    let done=false;
-    const finish=()=>{if(!done){done=true;resolve()}};
-    a.onended=finish;
-    a.onerror=()=>{$('phStatus')&&($('phStatus').textContent=`Audio unavailable: ${url}`);finish()};
-    const p=a.play();
-    if(p&&p.catch)p.catch(()=>{$('phStatus')&&($('phStatus').textContent=`Audio could not play: ${url}`);finish()});
-  });
-}
+function playSound(n){return new Promise(resolve=>{
+  let a=audio[n];
+  if(!a){a=new Audio(soundURL(n));a.preload='auto';audio[n]=a}
+  a.currentTime=0;
+  let finished=false;
+  const finish=()=>{if(!finished){finished=true;resolve()}};
+  a.onended=finish;a.onerror=finish;
+  const p=a.play();
+  if(p&&p.catch)p.catch(finish);
+  setTimeout(finish,5000);
+})}
 function layout(type){let dual=type.includes('+'),html='';if(type==='tetris'||type==='tetris+mr'||type==='tetris+phoneme')html+=`<div class="task-panel ${dual?'right':''} ${!dual?'center':''}" id="tetrisPanel"><div class="panel-inner"><p class="instruction">Tetris — choose a placement, then press SPACE.</p><div class="tetris-wrap"><div><canvas id="tetrisCanvas" width="300" height="600"></canvas></div><div><div class="next-label">NEXT</div><canvas id="nextCanvas" class="nextbox" width="112" height="70"></canvas><div class="metricline" id="tetrisStats"></div></div></div><div class="keyhint">L/R move · ↑ rotate · ↓ one row · SPACE hard drop</div><div class="feedback" id="tetrisFeedback"></div></div></div>`;if(type==='mr'||type==='tetris+mr')html+=`<div class="task-panel secondaryPanel ${dual?'left':'center'}" id="mrPanel"><div class="panel-inner"><p class="instruction">Mental rotation: <b>S</b> = same turned; <b>D</b> = mirror image.</p><canvas id="mrCanvas" class="mr-canvas" width="500" height="330"></canvas><div class="trial-counter" id="mrCounter"></div><div class="feedback" id="mrFeedback"></div></div></div>`;if(type==='phoneme'||type==='tetris+phoneme')html+=`<div class="task-panel secondaryPanel ${dual?'left':'center'}" id="phPanel"><div class="panel-inner phoneme"><p class="instruction">Phoneme discrimination: <b>S</b> = same; <b>D</b> = different.</p><div class="audio-status" id="phStatus">Listen for two sounds…</div><div class="trial-counter" id="phCounter"></div><div class="feedback" id="phFeedback"></div></div></div>`;$('taskLayout').className='task-layout'+(dual?'':' single');$('taskLayout').innerHTML=html}
 function startBlock(){clearAll();currentBlock=state.blocks[state.blockNo];layout(currentBlock);blockStart=performance.now();$('blockLabel').textContent=`Block ${state.blockNo+1}/5 · ${currentBlock}`;$('timeLabel').textContent='';$('trialLabel').textContent='';if(currentBlock.includes('tetris'))initTetris();if(currentBlock.includes('mr'))initMR(false);if(currentBlock.includes('phoneme'))initPh(false);show('experiment');blockTimer=setTimeout(endBlock,(cfg.blockSec*1000)+250)}
 function clearAll(){if(raf)cancelAnimationFrame(raf);clearTimeout(blockTimer);if(state.mr?.timer)clearTimeout(state.mr.timer);if(state.mr?.timeout)clearTimeout(state.mr.timeout);if(state.ph?.timer)clearTimeout(state.ph.timer);if(state.ph?.timeout)clearTimeout(state.ph.timeout);if(keyHandler)removeEventListener('keydown',keyHandler);keyHandler=null}
