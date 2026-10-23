@@ -51,13 +51,58 @@ function shuffle(a){a=a.slice();for(let i=a.length-1;i>0;i--){let j=Math.floor(M
 function fmt(x){return Number.isFinite(x)?x.toFixed(3):''}
 function updateTrialStatus(){let sec=+$('blockSec').value||180, ph=Math.floor(sec/3), mr=Math.floor(sec/6);$('trialStatus').textContent=`Main-block schedule: phoneme: ${ph} pairs, one every 3 s; mental rotation: ${mr} pairs, one every 6 s.`}
 ['blockSec','phDiff','mrWindow','phWindow'].forEach(id=>$(id).addEventListener('input',updateTrialStatus));updateTrialStatus();
-async function checkAudio(){let good=0;for(let i=1;i<=7;i++){try{let r=await fetch(`./stimuli/step${i}.wav`,{method:'GET',cache:'no-store'});if(r.ok){good++;try{let blob=await r.blob();audio[i]=new Audio(URL.createObjectURL(blob));}catch(e){}}}catch(e){}}$('soundStatus').innerHTML=good===7?`<span class="ok">All seven sound files loaded/available.</span>`:`<span class="error">${good}/7 sound files available. Expected ./stimuli/step1.wav through ./stimuli/step7.wav.</span>`}checkAudio();
+function stimulusURL(n){return new URL(`./stimuli/step${n}.wav`,document.baseURI).href}
+function checkOneAudio(n){
+  return new Promise(resolve=>{
+    const url=stimulusURL(n), a=new Audio();
+    let settled=false;
+    const finish=ok=>{
+      if(settled)return;
+      settled=true;
+      a.oncanplaythrough=a.onerror=a.onloadeddata=null;
+      if(ok){a.preload='auto';audio[n]=a;}
+      resolve({ok,url});
+    };
+    a.preload='auto';
+    a.oncanplaythrough=()=>finish(true);
+    a.onloadeddata=()=>finish(true);
+    a.onerror=()=>finish(false);
+    a.src=url;
+    a.load();
+    setTimeout(()=>finish(false),5000);
+  });
+}
+async function checkAudio(){
+  const results=[];
+  for(let i=1;i<=7;i++) results.push(await checkOneAudio(i));
+  const good=results.filter(x=>x.ok).length;
+  const failed=results.filter(x=>!x.ok).map(x=>x.url);
+  if(good===7){
+    $('soundStatus').innerHTML='<span class="ok">All seven WAV files are available.</span>';
+  }else{
+    $('soundStatus').innerHTML=`<span class="error">${good}/7 WAV files detected.</span><br><small>Expected files at the GitHub Pages location next to this HTML file in <code>stimuli/</code>. You can still start; phoneme playback will report any missing file.</small>${failed.length?`<br><small>Not detected: ${failed.join(', ')}</small>`:''}`;
+  }
+}
+checkAudio();
 function readCfg(){cfg={pid:$('pid').value.trim(),order:$('order').value,blockSec:+$('blockSec').value||180,practiceSec:+$('practiceSec').value||0,speed:clamp(+$('speed').value||650,300,1000),calibrate:$('calibrate').value==='yes',mrWindow:+$('mrWindow').value||6,phWindow:+$('phWindow').value||2,phDiff:+$('phDiff').value||3,practiceAcc:(+$('practiceAcc').value||75)/100,maxAttempts:+$('maxAttempts').value||3};}
 function orderBlocks(){let b=['tetris','mr','phoneme','tetris+mr','tetris+phoneme'];if(cfg.order==='fixed')return b;if(cfg.order==='singlesFirst')return ['tetris','mr','phoneme','tetris+mr','tetris+phoneme'];if(cfg.order==='random')return shuffle(b);let n=(cfg.pid.match(/\d+/)||['0'])[0],idx=+n%5;return b.slice(idx).concat(b.slice(0,idx));}
 $('startBtn').onclick=()=>{readCfg();if(!cfg.pid){alert('Participant ID is required.');return}if(cfg.order==='latin'&&!/\d/.test(cfg.pid)){alert('Counterbalanced Latin-square order requires a participant ID containing a number.');return}state={blockNo:0,blocks:orderBlocks(),tetrisSpeed:cfg.speed,practiceAttempts:{},practicePassed:{},metrics:{},mrTrials:[],phTrials:[]};beginIntro()};
 function beginIntro(){let b=state.blocks[state.blockNo];$('introTitle').textContent=`Block ${state.blockNo+1} of 5: ${b}`;$('introText').innerHTML=b==='tetris'?'Use L/R arrows to move, ↑ to rotate, ↓ to move down one row, and SPACE to hard drop. Press SPACE as soon as you have chosen a placement.':b==='mr'?'Two objects are shown. Press S if the right object is the same object turned; press D if it is a mirror image.':'Press S for same and D for different. For phoneme blocks, wear headphones and attend to the two sounds.';$('introExtra').innerHTML=(b==='phoneme'&&!state.headphones)?`<p><label><input type="checkbox" id="headphones"> I am wearing headphones and can hear the stimuli.</label></p><div class="audio-status"><button class="secondary" id="playExamples">Play example sounds</button> <span id="audioMsg"></span></div>`:'';$('introBtn').disabled=b==='phoneme'&&!state.headphones;$('introBtn').textContent=cfg.practiceSec?'Continue to practice':'Start block';show('introScreen');if(b==='phoneme'&&!state.headphones){$('headphones').onchange=e=>{$('introBtn').disabled=!e.target.checked;state.headphones=e.target.checked};$('playExamples').onclick=async()=>{await playSound(1);setTimeout(()=>playSound(7),500)}}}
 $('introBtn').onclick=()=>{if(cfg.practiceSec&&!state.practicePassed[state.blocks[state.blockNo]])runPractice();else startBlock()};
-function playSound(n){return new Promise(resolve=>{let a=audio[n]||(audio[n]=new Audio(`./stimuli/step${n}.wav`));a.currentTime=0;a.onended=resolve;a.onerror=resolve;a.play().catch(resolve)})}
+function playSound(n){
+  return new Promise(resolve=>{
+    const url=stimulusURL(n);
+    let a=audio[n];
+    if(!a){a=new Audio(url);a.preload='auto';audio[n]=a;}
+    a.currentTime=0;
+    let done=false;
+    const finish=()=>{if(!done){done=true;resolve()}};
+    a.onended=finish;
+    a.onerror=()=>{$('phStatus')&&($('phStatus').textContent=`Audio unavailable: ${url}`);finish()};
+    const p=a.play();
+    if(p&&p.catch)p.catch(()=>{$('phStatus')&&($('phStatus').textContent=`Audio could not play: ${url}`);finish()});
+  });
+}
 function layout(type){let dual=type.includes('+'),html='';if(type==='tetris'||type==='tetris+mr'||type==='tetris+phoneme')html+=`<div class="task-panel ${dual?'right':''} ${!dual?'center':''}" id="tetrisPanel"><div class="panel-inner"><p class="instruction">Tetris — choose a placement, then press SPACE.</p><div class="tetris-wrap"><div><canvas id="tetrisCanvas" width="300" height="600"></canvas></div><div><div class="next-label">NEXT</div><canvas id="nextCanvas" class="nextbox" width="112" height="70"></canvas><div class="metricline" id="tetrisStats"></div></div></div><div class="keyhint">L/R move · ↑ rotate · ↓ one row · SPACE hard drop</div><div class="feedback" id="tetrisFeedback"></div></div></div>`;if(type==='mr'||type==='tetris+mr')html+=`<div class="task-panel secondaryPanel ${dual?'left':'center'}" id="mrPanel"><div class="panel-inner"><p class="instruction">Mental rotation: <b>S</b> = same turned; <b>D</b> = mirror image.</p><canvas id="mrCanvas" class="mr-canvas" width="500" height="330"></canvas><div class="trial-counter" id="mrCounter"></div><div class="feedback" id="mrFeedback"></div></div></div>`;if(type==='phoneme'||type==='tetris+phoneme')html+=`<div class="task-panel secondaryPanel ${dual?'left':'center'}" id="phPanel"><div class="panel-inner phoneme"><p class="instruction">Phoneme discrimination: <b>S</b> = same; <b>D</b> = different.</p><div class="audio-status" id="phStatus">Listen for two sounds…</div><div class="trial-counter" id="phCounter"></div><div class="feedback" id="phFeedback"></div></div></div>`;$('taskLayout').className='task-layout'+(dual?'':' single');$('taskLayout').innerHTML=html}
 function startBlock(){clearAll();currentBlock=state.blocks[state.blockNo];layout(currentBlock);blockStart=performance.now();$('blockLabel').textContent=`Block ${state.blockNo+1}/5 · ${currentBlock}`;$('timeLabel').textContent='';$('trialLabel').textContent='';if(currentBlock.includes('tetris'))initTetris();if(currentBlock.includes('mr'))initMR(false);if(currentBlock.includes('phoneme'))initPh(false);show('experiment');blockTimer=setTimeout(endBlock,(cfg.blockSec*1000)+250)}
 function clearAll(){if(raf)cancelAnimationFrame(raf);clearTimeout(blockTimer);if(state.mr?.timer)clearTimeout(state.mr.timer);if(state.mr?.timeout)clearTimeout(state.mr.timeout);if(state.ph?.timer)clearTimeout(state.ph.timer);if(state.ph?.timeout)clearTimeout(state.ph.timeout);if(keyHandler)removeEventListener('keydown',keyHandler);keyHandler=null}
