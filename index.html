@@ -1,0 +1,372 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Mental Rotation Task</title>
+  <style>
+    :root {
+      --bg: #0f172a;
+      --panel: #172033;
+      --panel-2: #202d46;
+      --text: #f8fafc;
+      --muted: #a9b7ce;
+      --accent: #58c7ff;
+      --accent-2: #ffc857;
+      --cube: 34px;
+      --gap: 8px;
+    }
+
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      color: var(--text);
+      background: radial-gradient(circle at top, #1e3a5f 0, var(--bg) 45%);
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    .wrap { width: min(1100px, 94vw); margin: 0 auto; padding: 28px 0 44px; }
+    header { display: flex; justify-content: space-between; gap: 20px; align-items: start; margin-bottom: 20px; }
+    h1 { margin: 0 0 6px; font-size: clamp(1.5rem, 3vw, 2.2rem); }
+    p { line-height: 1.5; }
+    .subtitle { margin: 0; color: var(--muted); }
+
+    .panel {
+      background: rgba(23, 32, 51, .9);
+      border: 1px solid rgba(169, 183, 206, .2);
+      border-radius: 16px;
+      padding: 20px;
+      box-shadow: 0 14px 40px rgba(0,0,0,.2);
+    }
+
+    .setup-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; align-items: end; }
+    label { display: block; color: var(--muted); font-size: .88rem; margin-bottom: 5px; }
+    input, select, button {
+      font: inherit;
+      border-radius: 9px;
+      border: 1px solid #53627c;
+      background: #101827;
+      color: var(--text);
+      padding: 10px 12px;
+    }
+    input, select { width: 100%; }
+    button { cursor: pointer; font-weight: 650; }
+    button:hover { filter: brightness(1.15); }
+    button:focus-visible, input:focus-visible, select:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+    .primary { background: #087ea4; border-color: #36c3ed; }
+    .secondary { background: var(--panel-2); }
+    .danger { background: #7f2939; border-color: #ef7188; }
+
+    .instructions { color: var(--muted); margin: 16px 0 0; }
+    .instructions strong { color: var(--text); }
+    .hidden { display: none !important; }
+
+    .statusbar { display: flex; justify-content: space-between; gap: 14px; flex-wrap: wrap; color: var(--muted); margin-bottom: 14px; }
+    .statusbar strong { color: var(--text); }
+    .progress { height: 8px; background: #0d1422; border-radius: 99px; overflow: hidden; margin: 8px 0 22px; }
+    .progress > div { height: 100%; width: 0%; background: linear-gradient(90deg, var(--accent), #86f7cb); transition: width .2s ease; }
+
+    .stimulus-area { display: grid; grid-template-columns: 1fr 80px 1fr; gap: 10px; align-items: center; }
+    .stimulus-label { text-align: center; color: var(--muted); font-size: .9rem; margin-bottom: 5px; }
+    .versus { text-align: center; font-size: 1.4rem; font-weight: 800; color: var(--accent-2); }
+    .stage {
+      position: relative;
+      height: min(37vw, 360px);
+      min-height: 260px;
+      overflow: hidden;
+      border-radius: 14px;
+      border: 1px solid rgba(169, 183, 206, .23);
+      background: linear-gradient(145deg, #111b2c, #1c2940);
+      perspective: 850px;
+      perspective-origin: 50% 48%;
+    }
+    .stage::after {
+      content: "";
+      position: absolute;
+      inset: 65% 12% 12%;
+      background: radial-gradient(ellipse, rgba(0,0,0,.42), transparent 70%);
+      pointer-events: none;
+    }
+    .stimulus-image {
+      position: absolute;
+      inset: 10px;
+      width: calc(100% - 20px);
+      height: calc(100% - 20px);
+      object-fit: contain;
+      user-select: none;
+      -webkit-user-drag: none;
+    }
+    .asset-note { color: var(--muted); font-size: .82rem; margin-top: 14px; }
+
+    .response-row { display: flex; justify-content: center; gap: 14px; margin-top: 20px; }
+    .response-row button { min-width: 180px; font-size: 1.08rem; padding: 13px 18px; }
+    .key { display: inline-block; padding: 1px 8px; border: 1px solid currentColor; border-radius: 5px; margin-right: 5px; font-family: ui-monospace, monospace; }
+    #feedback { min-height: 26px; text-align: center; font-weight: 700; margin: 12px 0 0; }
+    .correct { color: #86f7cb; }
+    .incorrect { color: #ff8f9e; }
+
+    .results-table { width: 100%; border-collapse: collapse; margin-top: 12px; font-size: .92rem; }
+    .results-table th, .results-table td { border-bottom: 1px solid rgba(169,183,206,.2); padding: 8px; text-align: left; }
+    .results-table th { color: var(--muted); font-weight: 600; }
+    .summary { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin: 16px 0; }
+    .metric { background: var(--panel-2); border-radius: 10px; padding: 13px; }
+    .metric .value { display: block; font-size: 1.4rem; font-weight: 750; margin-top: 4px; }
+    .metric .name { color: var(--muted); font-size: .84rem; }
+
+    @media (max-width: 720px) {
+      .setup-grid { grid-template-columns: 1fr 1fr; }
+      .stimulus-area { grid-template-columns: 1fr; }
+      .versus { display: none; }
+      .stage { height: 280px; }
+      .response-row { flex-direction: column; align-items: stretch; }
+      .response-row button { width: 100%; }
+    }
+  </style>
+</head>
+<body>
+  <main class="wrap">
+    <header>
+      <div>
+        <h1>Mental Rotation Task</h1>
+        <p class="subtitle">Shepard–Metzler-style comparison of ten distinct 3D block structures</p>
+      </div>
+      <button id="downloadTop" class="secondary hidden">Download data</button>
+    </header>
+
+    <section id="setup" class="panel">
+      <div class="setup-grid">
+        <div>
+          <label for="participant">Participant ID</label>
+          <input id="participant" type="text" placeholder="e.g., P001" autocomplete="off" />
+        </div>
+        <div>
+          <label for="trialCount">Trials</label>
+          <input id="trialCount" type="number" min="4" max="200" value="40" />
+        </div>
+        <div>
+          <label for="practiceCount">Practice trials</label>
+          <input id="practiceCount" type="number" min="0" max="20" value="4" />
+        </div>
+        <button id="startBtn" class="primary">Start experiment</button>
+      </div>
+      <p class="instructions">
+        Press <strong>S</strong> when the structures are the <strong>same</strong> shape and <strong>D</strong> when they are <strong>different</strong>.
+        The second structure is rotated in depth. Respond as quickly and accurately as possible. The default experiment includes 40 test trials after 4 practice trials.
+      </p>
+    </section>
+
+    <section id="task" class="panel hidden" aria-live="polite">
+      <div class="statusbar">
+        <span>Phase: <strong id="phaseText">Practice</strong></span>
+        <span>Trial: <strong id="trialText">0 / 0</strong></span>
+        <span>Accuracy: <strong id="accuracyText">—</strong></span>
+      </div>
+      <div class="progress"><div id="progressBar"></div></div>
+
+      <div class="stimulus-area">
+        <div>
+          <div class="stimulus-label">Structure 1</div>
+          <div class="stage" id="stageLeft"><img class="stimulus-image" id="imageLeft" alt="Left mental rotation stimulus" draggable="false" /></div>
+        </div>
+        <div class="versus">VS</div>
+        <div>
+          <div class="stimulus-label">Structure 2</div>
+          <div class="stage" id="stageRight"><img class="stimulus-image" id="imageRight" alt="Right mental rotation stimulus" draggable="false" /></div>
+        </div>
+      </div>
+
+      <div id="feedback"></div>
+      <div class="response-row">
+        <button id="sameBtn" class="primary"><span class="key">S</span> Same</button>
+        <button id="differentBtn" class="secondary"><span class="key">D</span> Different</button>
+      </div>
+    </section>
+
+    <section id="complete" class="panel hidden">
+      <h2>Experiment complete</h2>
+      <div class="summary">
+        <div class="metric"><span class="name">Test accuracy</span><span class="value" id="finalAccuracy">—</span></div>
+        <div class="metric"><span class="name">Mean correct RT</span><span class="value" id="finalRT">—</span></div>
+        <div class="metric"><span class="name">Participant</span><span class="value" id="finalParticipant">—</span></div>
+      </div>
+      <button id="downloadBtn" class="primary">Download CSV data</button>
+      <button id="restartBtn" class="secondary">Start over</button>
+      <table class="results-table">
+        <thead><tr><th>Trial</th><th>Figure</th><th>Correct</th><th>Response</th><th>RT (ms)</th><th>Rotation index</th><th>Condition</th></tr></thead>
+        <tbody id="resultsBody"></tbody>
+      </table>
+    </section>
+  </main>
+
+  <script>
+    // GitHub-hosted Kim et al. (2025) 10-cube stimuli.
+    // Recommended repository layout:
+    // stimuli/[10 cube] Rotations/A/A0.jpg
+    // stimuli/[10 cube] Mirrored Rotations/A_m/A0_m.jpg
+    // Change STIMULUS_ROOT if your folders are stored elsewhere.
+    const STIMULUS_ROOT = 'stimuli';
+    const ROTATIONS_DIR = '[10 cube] Rotations';
+    const MIRRORED_DIR = '[10 cube] Mirrored Rotations';
+    const FIGURES = Array.from('ABCDEFGHIJKLMNO');
+    const ROTATION_INDICES = Array.from({ length: 15 }, (_, i) => i);
+
+    function stimulusPath(kind, figure, rotationIndex) {
+      const mirrored = kind === 'different';
+      const directory = mirrored ? MIRRORED_DIR : ROTATIONS_DIR;
+      const folder = mirrored ? `${figure}_m` : figure;
+      const suffix = mirrored ? '_m' : '';
+      return encodeURI(`${STIMULUS_ROOT}/${directory}/${folder}/${figure}${rotationIndex}${suffix}.jpg`);
+    }
+
+    const state = {
+      participant: '',
+      practiceTotal: 0,
+      testTotal: 0,
+      phase: 'practice',
+      phaseIndex: 0,
+      testRows: [],
+      current: null,
+      onset: 0,
+      trialSequence: [],
+      responded: false,
+      phaseCorrect: 0
+    };
+
+    const $ = id => document.getElementById(id);
+    const rand = (n) => Math.floor(Math.random() * n);
+    const pick = arr => arr[rand(arr.length)];
+    const shuffle = arr => [...arr].sort(() => Math.random() - .5);
+
+    function makeTrial() {
+      const figure = pick(FIGURES);
+      const rotationIndex = pick(ROTATION_INDICES);
+      const same = Math.random() < .5;
+      return { figure, rotationIndex, same, condition: same ? 'same' : 'different' };
+    }
+
+    function newTrial() {
+      state.responded = false;
+      $('feedback').textContent = '';
+      $('feedback').className = '';
+      const trial = state.trialSequence[state.phaseIndex] || makeTrial();
+      const leftPath = stimulusPath('same', trial.figure, 0);
+      const rightPath = stimulusPath(trial.condition, trial.figure, trial.rotationIndex);
+      $('imageLeft').src = leftPath;
+      $('imageRight').src = rightPath;
+      $('imageLeft').alt = `Figure ${trial.figure}, rotation index 0`;
+      $('imageRight').alt = `Figure ${trial.figure}, ${trial.condition}, rotation index ${trial.rotationIndex}`;
+      state.current = trial;
+      state.onset = performance.now();
+    }
+
+    function updateStatus() {
+      const total = state.phase === 'practice' ? state.practiceTotal : state.testTotal;
+      $('phaseText').textContent = state.phase === 'practice' ? 'Practice' : 'Test';
+      $('trialText').textContent = `${state.phaseIndex} / ${total}`;
+      $('progressBar').style.width = `${total ? (state.phaseIndex / total) * 100 : 0}%`;
+      const denom = state.phaseIndex;
+      $('accuracyText').textContent = denom ? `${Math.round(state.phaseCorrect / denom * 100)}%` : '—';
+    }
+
+    function beginPhase(phase) {
+      state.phase = phase;
+      state.phaseIndex = 0;
+      state.phaseCorrect = 0;
+      state.trialSequence = Array.from({ length: phase === 'practice' ? state.practiceTotal : state.testTotal }, makeTrial);
+      $('task').classList.remove('hidden');
+      $('setup').classList.add('hidden');
+      $('complete').classList.add('hidden');
+      updateStatus();
+      newTrial();
+    }
+
+    function respond(response) {
+      if (!state.current || state.responded) return;
+      state.responded = true;
+      const rt = Math.round(performance.now() - state.onset);
+      const correct = (response === 'same') === state.current.same;
+      state.phaseCorrect += correct ? 1 : 0;
+      $('feedback').textContent = correct ? 'Correct' : 'Incorrect';
+      $('feedback').className = correct ? 'correct' : 'incorrect';
+
+      if (state.phase === 'test') {
+        state.testRows.push({
+          participant: state.participant,
+          trial: state.phaseIndex,
+          response,
+          correct,
+          rt_ms: rt,
+          rotation_index: state.current.rotationIndex,
+          figure: state.current.figure,
+          condition: state.current.condition,
+          timestamp: new Date().toISOString()
+        });
+      }
+
+      setTimeout(() => {
+        state.phaseIndex += 1;
+        const total = state.phase === 'practice' ? state.practiceTotal : state.testTotal;
+        if (state.phaseIndex >= total) {
+          if (state.phase === 'practice' && state.testTotal > 0) beginPhase('test');
+          else finish();
+        } else {
+          updateStatus();
+          newTrial();
+        }
+      }, 450);
+    }
+
+    function csvEscape(value) {
+      const s = String(value ?? '');
+      return /[",\n]/.test(s) ? '"' + s.replaceAll('"', '""') + '"' : s;
+    }
+
+    function downloadCSV() {
+      const headers = ['participant','trial','figure','response','correct','rt_ms','rotation_index','condition','timestamp'];
+      const csv = [headers.join(','), ...state.testRows.map(row => headers.map(h => csvEscape(row[h])).join(','))].join('\n');
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${state.participant || 'participant'}_mental_rotation.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+
+    function finish() {
+      $('task').classList.add('hidden');
+      $('complete').classList.remove('hidden');
+      $('downloadTop').classList.remove('hidden');
+      const n = state.testRows.length;
+      const correct = state.testRows.filter(r => r.correct).length;
+      const rts = state.testRows.filter(r => r.correct).map(r => r.rt_ms);
+      $('finalAccuracy').textContent = n ? `${Math.round(correct / n * 100)}%` : '—';
+      $('finalRT').textContent = rts.length ? `${Math.round(rts.reduce((a,b) => a+b, 0) / rts.length)} ms` : '—';
+      $('finalParticipant').textContent = state.participant || '—';
+      $('resultsBody').innerHTML = state.testRows.map(r => `<tr><td>${r.trial}</td><td>${r.figure}</td><td>${r.correct ? 'Yes' : 'No'}</td><td>${r.response}</td><td>${r.rt_ms}</td><td>${r.rotation_index}</td><td>${r.condition}</td></tr>`).join('');
+    }
+
+    $('startBtn').addEventListener('click', () => {
+      state.participant = $('participant').value.trim() || 'anonymous';
+      state.testTotal = Math.max(0, Math.min(200, Number($('trialCount').value) || 40));
+      state.practiceTotal = Math.max(0, Math.min(20, Number($('practiceCount').value) || 0));
+      state.testRows = [];
+      if (state.practiceTotal === 0) beginPhase('test');
+      else beginPhase('practice');
+    });
+    $('sameBtn').addEventListener('click', () => respond('same'));
+    $('differentBtn').addEventListener('click', () => respond('different'));
+    $('downloadBtn').addEventListener('click', downloadCSV);
+    $('downloadTop').addEventListener('click', downloadCSV);
+    $('restartBtn').addEventListener('click', () => window.location.reload());
+
+    document.addEventListener('keydown', event => {
+      if ($('task').classList.contains('hidden')) return;
+      const key = event.key.toLowerCase();
+      if (key === 's') { event.preventDefault(); respond('same'); }
+      if (key === 'd') { event.preventDefault(); respond('different'); }
+    });
+  </script>
+</body>
+</html>
