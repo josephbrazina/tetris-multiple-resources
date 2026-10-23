@@ -30,7 +30,7 @@
 <script>
 'use strict';
 const TOTAL=60, TRIAL_MS=3000, TOTAL_MS=180000, AUDIO_GAP_MS=750;
-const audio={};let trials=[],results=[],trialIndex=-1,taskStart=0,trialTimer=null,finishTimer=null,responseLocked=false,responded=false;
+const audio={};let trials=[],results=[],trialIndex=-1,taskStart=0,trialTimer=null,finishTimer=null,responded=false,activeSources=[];
 const $=id=>document.getElementById(id);
 const shuffle=a=>{for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a};
 function buildTrials(){
@@ -41,11 +41,12 @@ function buildTrials(){
 async function preload(){
  const urls=[];for(let i=1;i<=7;i++)urls.push([i,`stimuli/step${i}.wav`]);
  try{await Promise.all(urls.map(async([i,url])=>{const r=await fetch(url,{cache:'no-cache'});if(!r.ok)throw new Error(`${url} (${r.status})`);const b=await r.arrayBuffer();const ctx=new (window.AudioContext||window.webkitAudioContext)();audio[i]=await ctx.decodeAudioData(b);audio[i].ctx=ctx}));$('loadStatus').textContent='All 7 audio stimuli are ready.';$('start').disabled=false}catch(e){$('loadStatus').innerHTML=`<span class="warning">Audio unavailable: ${e.message}</span><br>Place the <code>stimuli</code> folder beside this HTML file.`;$('start').disabled=true}}
-function playSound(level,when){const x=audio[level],src=x.ctx.createBufferSource();src.buffer=x;src.connect(x.ctx.destination);src.start(when)}
-function playPair(t){const x=audio[t.a];const now=x.ctx.currentTime+.03;playSound(t.a,now);playSound(t.b,now+AUDIO_GAP_MS/1000)}
+function stopActiveSources(){for(const src of activeSources){try{src.stop()}catch(e){}try{src.disconnect()}catch(e){}}activeSources=[]}
+function playSound(level,when){const x=audio[level],src=x.ctx.createBufferSource();src.buffer=x;src.connect(x.ctx.destination);activeSources.push(src);src.onended=()=>{activeSources=activeSources.filter(s=>s!==src)};src.start(when)}
+function playPair(t){stopActiveSources();const x=audio[t.a];const now=x.ctx.currentTime+.05;playSound(t.a,now);playSound(t.b,now+AUDIO_GAP_MS/1000)}
 function record(response,timeout=false){if(responded)return;responded=true;const t=trials[trialIndex],rt=performance.now()-(taskStart+trialIndex*TRIAL_MS);const correct=(response==='same')===(t.condition==='same');results.push({participant:$('participant').value.trim(),trial:trialIndex+1,first_level:t.a,second_level:t.b,condition:t.condition,response:response||'',correct:timeout?false:correct,timeout,rt_ms:timeout?'':Math.round(rt),trial_start_ms:Math.round(trialIndex*TRIAL_MS)});$('taskStatus').textContent=timeout?'No response — scored incorrect.':`${response==='same'?'Same':'Different'} response recorded.`;updateAccuracy()}
 function updateAccuracy(){const answered=results.filter(x=>x.response||x.timeout);const n=answered.length;if(!n){$('accuracy').textContent='—';return}$('accuracy').textContent=`${Math.round(100*answered.filter(x=>x.correct).length/n)}%`}
-function beginTrial(i){if(i>=TOTAL)return;trialIndex=i;responded=false;responseLocked=false;const t=trials[i];$('trialNo').textContent=i+1;$('playing').textContent='Listen';$('taskStatus').textContent='Respond within 3 seconds.';$('bar').style.width=`${((i*TRIAL_MS)/TOTAL_MS)*100}%`;playPair(t);clearTimeout(trialTimer);trialTimer=setTimeout(()=>{record('',true);beginTrial(i+1)},TRIAL_MS)}
+function beginTrial(i){if(i>=TOTAL)return;trialIndex=i;responded=false;const t=trials[i];$('trialNo').textContent=i+1;$('playing').textContent='Listen';$('taskStatus').textContent='Respond within 3 seconds.';$('bar').style.width=`${((i*TRIAL_MS)/TOTAL_MS)*100}%`;playPair(t);clearTimeout(trialTimer);trialTimer=setTimeout(()=>{if(!responded)record('',true);if(i+1<TOTAL)beginTrial(i+1)},TRIAL_MS)}
 function finish(){clearTimeout(trialTimer);$('bar').style.width='100%';$('task').classList.add('hidden');$('done').classList.remove('hidden');const correct=results.filter(x=>x.correct).length;$('summary').textContent=`Completed 60 trials in exactly 3 minutes. Accuracy: ${correct}/${TOTAL} (${Math.round(100*correct/TOTAL)}%).`}
 function startTask(){if(!$('participant').value.trim()){alert('Enter a participant ID.');return}trials=buildTrials();results=[];trialIndex=-1;$('setup').classList.add('hidden');$('done').classList.add('hidden');$('task').classList.remove('hidden');taskStart=performance.now();beginTrial(0);clearTimeout(finishTimer);finishTimer=setTimeout(finish,TOTAL_MS)}
 function csv(){const cols=['participant','trial','first_level','second_level','condition','response','correct','timeout','rt_ms','trial_start_ms'];const lines=[cols.join(',')].concat(results.sort((a,b)=>a.trial-b.trial).map(r=>cols.map(c=>`"${String(r[c]??'').replaceAll('"','""')}"`).join(',')));return lines.join('\n')}
