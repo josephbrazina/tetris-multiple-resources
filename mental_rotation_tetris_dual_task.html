@@ -76,44 +76,47 @@
   `;
   const ready = {rotation:false,tetris:false};
 
-  // Route keyboard input explicitly. A key pressed while focus is in either
-  // iframe does not bubble to the parent, so listen on the parent and both
-  // child windows. S/D go only to mental rotation; arrows/Space go only to Tetris.
-  const bridgeInstalled = new WeakSet();
+  // Route controls directly from the parent and both iframe windows.
+  // S/D are handled by the mental-rotation controller; arrows/Space go to Tetris.
   const rotationCodes = new Set(['KeyS','KeyD']);
   const tetrisCodes = new Set(['ArrowLeft','ArrowRight','ArrowUp','ArrowDown','Space']);
 
   function dispatchToFrame(frame, event) {
-    const win = frame.contentWindow, doc = frame.contentDocument;
-    if (!win || !doc) return;
-    const init = {
-      key:event.key, code:event.code, location:event.location,
-      repeat:event.repeat, bubbles:true, cancelable:true
-    };
-    // Dispatch once to the child window. It bubbles through the child document,
-    // which covers handlers installed on window, document, or body.
-    const bridged = new KeyboardEvent(event.type, init);
-    Object.defineProperty(bridged, '__dualTaskBridge', {value:true});
-    win.dispatchEvent(bridged);
+    const doc = frame.contentDocument;
+    if (!doc?.body) return;
+    const bridged = new KeyboardEvent(event.type, {
+      key:event.key, code:event.code, location:event.location, repeat:event.repeat,
+      bubbles:true, cancelable:true, composed:true
+    });
+    try {
+      Object.defineProperty(bridged, 'keyCode', {value:event.keyCode || 0});
+      Object.defineProperty(bridged, 'which', {value:event.which || event.keyCode || 0});
+    } catch {}
+    doc.body.dispatchEvent(bridged);
+  }
+
+  function routeKey(event) {
+    if (rotationCodes.has(event.code)) {
+      event.preventDefault();
+      event.stopPropagation();
+      rotationController?.capture(event.key.toLowerCase());
+    } else if (tetrisCodes.has(event.code)) {
+      event.preventDefault();
+      event.stopPropagation();
+      dispatchToFrame(tetrisFrame, event);
+    }
   }
 
   function installBridgeOn(win) {
-    if (!win || bridgeInstalled.has(win)) return;
-    bridgeInstalled.add(win);
-    win.addEventListener('keydown', event => {
-      if (event.__dualTaskBridge) return;
-      if (rotationCodes.has(event.code)) {
+    if (!win || win.__dualTaskBridgeInstalled) return;
+    win.__dualTaskBridgeInstalled = true;
+    win.addEventListener('keydown', routeKey, true);
+    win.addEventListener('keyup', event => {
+      if (tetrisCodes.has(event.code)) {
         event.preventDefault();
-        dispatchToFrame(rotationFrame, event);
-      } else if (tetrisCodes.has(event.code)) {
-        event.preventDefault();
+        event.stopPropagation();
         dispatchToFrame(tetrisFrame, event);
       }
-    }, true);
-    win.addEventListener('keyup', event => {
-      if (event.__dualTaskBridge) return;
-      if (rotationCodes.has(event.code)) dispatchToFrame(rotationFrame, event);
-      else if (tetrisCodes.has(event.code)) dispatchToFrame(tetrisFrame, event);
     }, true);
   }
 
@@ -123,15 +126,20 @@
     installBridgeOn(tetrisFrame.contentWindow);
   }
 
-  // Keep each mental-rotation pair on screen for a fixed six-second window.
-  // Responses are captured, then committed only when that window expires.
+  // Keep every mental-rotation pair visible for exactly 6,000 ms.
+  // A response is displayed immediately but is scored/committed only at 6 s.
   let rotationController = null;
   let rotationEndTimer = null;
+
   function installRotationTiming() {
     const doc = rotationFrame.contentDocument;
     if (!doc || rotationController) return;
-    const state = {running:false, ended:false, trialStarted:0, signature:'', response:null, timer:null, observer:null, stopTimer:null, committing:false};
+    const state = {
+      running:false, ended:false, trialStarted:0, nextAllowed:0, signature:'',
+      response:null, timer:null, observer:null, committing:false
+    };
     rotationController = state;
+
     const answerButtons = () => [...doc.querySelectorAll('button,[role="button"]')].filter(el => {
       const text = `${el.id} ${el.className} ${el.textContent}`.toLowerCase();
       return /same|different|identical|rotated|key.?s|key.?d/.test(text) && !el.disabled;
@@ -145,69 +153,103 @@
       const el = stimulus();
       return `${el.innerHTML}|${el.querySelector?.('img')?.src || ''}|${el.querySelector?.('canvas')?.toDataURL?.() || ''}`;
     };
-    const answerKey = el => {
-      const text = `${el.id} ${el.className} ${el.textContent}`.toLowerCase();
-      return /same|identical|key.?s/.test(text) ? 's' : 'd';
+    const answerKey = el => /same|identical|key.?s/.test(`${el.id} ${el.className} ${el.textContent}`.toLowerCase()) ? 's' : 'd';
+
+    const responseIndicator = () => {
+      let el = doc.getElementById('dualTaskResponse');
+      if (!el) {
+        el = doc.createElement('div');
+        el.id = 'dualTaskResponse';
+        el.setAttribute('aria-live','polite');
+        el.style.cssText = 'min-height:28px;margin:10px 0 0;text-align:center;color:#69d6ce;font:700 18px system-ui;';
+        stimulus().insertAdjacentElement('afterend', el);
+      }
+      return el;
     };
+    const showResponse = key => {
+      responseIndicator().textContent = key === 's'
+        ? 'Response: S — same'
+        : 'Response: D — different';
+    };
+
     const commit = key => {
       if (!key || state.committing || state.ended) return;
       state.committing = true;
       const button = answerFor(key);
       if (button) button.click();
-      else doc.dispatchEvent(new KeyboardEvent('keydown',{key,code:key === 's' ? 'KeyS' : 'KeyD',bubbles:true,cancelable:true}));
+      else doc.body.dispatchEvent(new KeyboardEvent('keydown', {
+        key, code:key === 's' ? 'KeyS' : 'KeyD', bubbles:true, cancelable:true
+      }));
       state.committing = false;
     };
+
     const beginTrial = sig => {
       if (!state.running || state.ended || !sig || sig === state.signature) return;
+      // Ignore DOM mutations caused by the answer/score display until the
+      // current 6-second window has expired.
+      if (performance.now() < state.nextAllowed) return;
       clearTimeout(state.timer);
       state.signature = sig;
       state.response = null;
+      responseIndicator().textContent = '';
       state.trialStarted = performance.now();
+      state.nextAllowed = state.trialStarted + 6000;
       state.timer = setTimeout(() => {
         if (state.ended) return;
-        // A missing response is scored as an incorrect response. If the task
-        // exposes the correct answer in markup, choose the opposite; otherwise
-        // use D, matching the task's normal response path.
         let key = state.response;
         if (!key) {
-          const markedCorrect = answerButtons().find(el => /correct|answer|target/.test(`${el.dataset.correct} ${el.dataset.answer} ${el.getAttribute('aria-label') || ''}`.toLowerCase()));
+          const markedCorrect = answerButtons().find(el =>
+            /correct|answer|target/.test(`${el.dataset.correct} ${el.dataset.answer} ${el.getAttribute('aria-label') || ''}`.toLowerCase()));
           key = markedCorrect ? (answerKey(markedCorrect) === 's' ? 'd' : 's') : 'd';
         }
         commit(key);
+        // Start the next pair only after the exact 6-second deadline.
+        setTimeout(() => beginTrial(signature()), 0);
       }, 6000);
     };
-    const keyHandler = event => {
+
+    state.capture = key => {
       if (!state.running || state.ended || state.committing) return;
+      if (key === 's' || key === 'd') {
+        state.response = key;
+        showResponse(key);
+      }
+    };
+
+    const keyHandler = event => {
       const key = event.key?.toLowerCase();
-      if (key !== 's' && key !== 'd') return;
-      event.preventDefault();
-      event.stopImmediatePropagation();
-      state.response = key;
+      if (key === 's' || key === 'd') {
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        state.capture(key);
+      }
     };
     const clickHandler = event => {
-      if (!state.running || state.ended || state.committing) return;
       const button = event.target.closest?.('button,[role="button"]');
-      if (!button || !answerButtons().includes(button)) return;
-      event.preventDefault();
-      event.stopImmediatePropagation();
-      state.response = answerKey(button);
+      if (button && answerButtons().includes(button)) {
+        event.preventDefault();
+        event.stopImmediatePropagation();
+      }
     };
     doc.addEventListener('keydown', keyHandler, true);
     doc.addEventListener('click', clickHandler, true);
     state.observer = new MutationObserver(() => beginTrial(signature()));
     state.observer.observe(doc.body, {subtree:true, childList:true, characterData:true, attributes:true, attributeFilter:['src','class','style']});
-    state.start = () => { state.running = true; state.ended = false; state.signature = ''; setTimeout(() => beginTrial(signature()), 50); };
+
+    state.start = () => {
+      state.running = true; state.ended = false; state.signature = '';
+      setTimeout(() => beginTrial(signature()), 50);
+    };
     state.end = () => {
       if (state.ended) return;
       state.ended = true; state.running = false; clearTimeout(state.timer); state.observer?.disconnect();
-      doc.querySelectorAll('button,[role="button"]').forEach(el => { if (answerButtons().includes(el)) el.disabled = true; });
-      const finish = [...doc.querySelectorAll('button,a,[role="button"]')].find(el => /finish|end|complete|download results|save results/i.test(el.textContent || ''));
-      if (finish && !finish.disabled) finish.click();
-      const note = doc.createElement('div'); note.textContent = 'Mental rotation task ended after 3 minutes.';
+      const note = doc.createElement('div');
+      note.textContent = 'Mental rotation task ended after 3 minutes.';
       note.style.cssText = 'position:fixed;inset:0;background:#101827eF;display:grid;place-items:center;color:white;font:700 22px system-ui;z-index:99999;';
       doc.body.append(note);
     };
   }
+
   function loaded(name, frame, css) {
     const doc = frame.contentDocument;
     const expected = name === 'rotation' ? 'startBtn' : 'start';
@@ -248,8 +290,8 @@
     const m = rotationFrame.contentDocument, t = tetrisFrame.contentDocument;
     m.getElementById('participant').value = id;
     m.getElementById('trialCount').value = $('trials').value;
-    // Practice trials are intentionally disabled for this dual-task version.
-    m.getElementById('practiceCount').value = 0;
+    const practiceInput = m.getElementById('practiceCount');
+    if (practiceInput) practiceInput.value = 0;
     t.getElementById('participant').value = id;
     t.getElementById('order').value = order;
     t.getElementById('speed').value = speed;
@@ -261,7 +303,7 @@
     start.disabled = true;
     start.textContent = 'Tasks running';
     for (const input of document.querySelectorAll('.fields input')) input.disabled = true;
-    message.textContent = 'Both tasks started together. Mental rotation and Tetris run simultaneously for three minutes. Download each task’s CSV from its own panel.';
+    message.textContent = 'Both tasks started together. Mental rotation continues at your pace; Tetris ends automatically after three minutes. Download each task’s CSV from its own panel.';
   });
 </script>
 </body>
