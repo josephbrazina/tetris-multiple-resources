@@ -1,0 +1,154 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Phoneme Discrimination + Tetris | Dual Task</title>
+<style>
+:root{font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color-scheme:dark;color:#f4f8ff;background:#0d1424}
+*{box-sizing:border-box}body{margin:0}.shell{width:min(1840px,98%);margin:auto;padding:18px 0 32px}
+h1{margin:0 0 4px;font-size:clamp(23px,2.7vw,34px)}p{margin:8px 0 0;color:#abbcd8;line-height:1.45}
+.setup{background:#18243b;border:1px solid #344363;border-radius:12px;padding:16px;margin:14px 0}
+.fields{display:grid;grid-template-columns:repeat(3,minmax(110px,1fr)) auto;gap:12px;align-items:end}
+label{display:block;color:#bdcce6;font-size:13px}input{width:100%;display:block;margin-top:5px;padding:10px;background:#0c1529;border:1px solid #536483;border-radius:8px;color:#fff;font:inherit}
+button{padding:11px 16px;border:0;border-radius:8px;background:#69d6ce;color:#10202d;font:inherit;font-weight:700;cursor:pointer;white-space:nowrap}button:disabled{opacity:.55;cursor:not-allowed}
+.columns{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:14px;align-items:start}.pane{position:relative;min-width:0;background:#131d30;border:1px solid #344363;border-radius:12px;overflow:hidden}.pane-title{padding:12px 16px 0;font-weight:750;color:#d9e9ff}
+iframe{display:block;width:100%;height:850px;border:0;background:transparent}.waiting{position:absolute;top:90px;left:16px;right:16px;text-align:center;color:#abbcd8;pointer-events:none}.waiting[hidden]{display:none}#message{min-height:21px}
+@media(max-width:1150px){.columns{grid-template-columns:1fr}}@media(max-width:560px){.fields{grid-template-columns:repeat(2,minmax(0,1fr))}.fields button{grid-column:1/-1}iframe{height:960px}}
+</style>
+</head>
+<body>
+<main class="shell">
+<h1>Phoneme Discrimination + Tetris</h1>
+<p>Dual-task condition: listen and respond on the left while playing Tetris on the right. Both tasks run for three minutes. The phoneme task uses the seven WAV files in <code>stimuli/</code>.</p>
+<section class="setup" aria-label="Shared task setup">
+  <div class="fields">
+    <label>Participant ID<input id="participant" required autocomplete="off" placeholder="e.g., P001"></label>
+    <label>Block order position<input id="order" type="number" min="1" step="1" value="1"></label>
+    <label>Gravity drop speed (ms/cell)<input id="speed" type="number" min="100" max="10000" step="1" value="800"></label>
+    <button id="start" disabled>Loading tasks…</button>
+  </div>
+  <p id="message" role="status">Loading the original phoneme-discrimination and Tetris tasks and seven audio stimuli.</p>
+</section>
+<div class="columns">
+  <section class="pane" aria-label="Phoneme discrimination task">
+    <div class="pane-title">Phoneme discrimination · S = same, D = different</div>
+    <div class="waiting" id="waiting">Enter your participant ID above, then start both tasks.</div>
+    <iframe id="phonemeFrame" title="Phoneme discrimination task"></iframe>
+  </section>
+  <section class="pane" aria-label="Tetris task">
+    <div class="pane-title">Tetris · ← → move, ↑ counterclockwise, ↓ down, Space hard drop</div>
+    <iframe id="tetrisFrame" title="Tetris task"></iframe>
+  </section>
+</div>
+</main>
+<script>
+'use strict';
+// Place this page beside phoneme_discrimination.html and tetris_experiment.html.
+// The phoneme page loads stimuli/step1.wav through stimuli/step7.wav from this directory.
+const phonemeFrame=document.getElementById('phonemeFrame');
+const tetrisFrame=document.getElementById('tetrisFrame');
+const startButton=document.getElementById('start');
+const message=document.getElementById('message');
+const ready={phoneme:false,tetris:false};
+const tetrisCodes=new Set(['ArrowLeft','ArrowRight','ArrowUp','ArrowDown','Space']);
+const forwardedEvents=new WeakSet();
+let running=false,installed=false;
+
+function routeKey(event){
+  if(!running||forwardedEvents.has(event)||event.ctrlKey||event.metaKey||event.altKey)return;
+  const code=event.code||({s:'KeyS',d:'KeyD',' ':'Space'}[event.key?.toLowerCase()]||event.key);
+  const phoneme=code==='KeyS'||code==='KeyD';
+  if(!phoneme&&!tetrisCodes.has(code))return;
+  event.preventDefault();
+  event.stopImmediatePropagation();
+  // Forward both keydown and keyup so held Down works and stops correctly.
+  const frame=phoneme?phonemeFrame:tetrisFrame;
+  const win=frame.contentWindow;
+  const target=frame.contentDocument.body;
+  const forwarded=new win.KeyboardEvent(event.type,{
+    key:code==='Space'?' ':phoneme?code.slice(-1).toLowerCase():code,
+    code,bubbles:true,cancelable:true,repeat:event.repeat,
+    shiftKey:event.shiftKey,ctrlKey:event.ctrlKey,altKey:event.altKey,metaKey:event.metaKey
+  });
+  forwardedEvents.add(forwarded);
+  target.dispatchEvent(forwarded);
+}
+
+function updateReady(){
+  if(!ready.phoneme||!ready.tetris||installed)return;
+  installed=true;
+  // Capture key events regardless of which panel currently has keyboard focus.
+  for(const win of [window,phonemeFrame.contentWindow,tetrisFrame.contentWindow]){
+    win.addEventListener('keydown',routeKey,true);
+    win.addEventListener('keyup',routeKey,true);
+  }
+  startButton.disabled=false;
+  startButton.textContent='Start both tasks';
+  message.textContent='Both tasks and all seven WAV files are ready. S/D answer the sounds; arrows and Space control Tetris from either panel.';
+}
+
+phonemeFrame.addEventListener('load',()=>{
+  try{
+    const doc=phonemeFrame.contentDocument;
+    if(!doc?.getElementById('start'))throw Error('phoneme_discrimination.html was not found');
+    const style=doc.createElement('style');
+    style.textContent='#setup{display:none!important}body{min-height:0;padding:14px 8px;display:block}.card{margin:auto;width:min(760px,100%)}';
+    doc.head.append(style);
+    // The original task preloads its WAV files before enabling its Start button.
+    const check=()=>{
+      if(doc.getElementById('start').disabled){
+        const status=doc.getElementById('loadStatus')?.textContent||'';
+        if(status.includes('Audio unavailable')){
+          message.textContent=status+' Host these pages together and put step1.wav–step7.wav directly in stimuli/.';
+          return;
+        }
+        setTimeout(check,200);
+        return;
+      }
+      ready.phoneme=true;updateReady();
+    };
+    check();
+  }catch(error){message.textContent=`Phoneme setup error: ${error.message}. Host all pages on the same origin.`;}
+});
+tetrisFrame.addEventListener('load',()=>{
+  try{
+    const doc=tetrisFrame.contentDocument;
+    if(!doc?.getElementById('start'))throw Error('tetris_experiment.html was not found');
+    const style=doc.createElement('style');
+    style.textContent='body{display:block;min-height:0;padding:16px 8px 26px}.app{width:100%}.layout{grid-template-columns:minmax(0,300px) minmax(170px,1fr);gap:12px}.card{padding:11px}.fields label,#start{display:none!important}@media(max-width:570px){.layout{grid-template-columns:minmax(0,300px);justify-content:center}}';
+    doc.head.append(style);
+    ready.tetris=true;updateReady();
+  }catch(error){message.textContent=`Tetris setup error: ${error.message}. Host all pages on the same origin.`;}
+});
+phonemeFrame.src='phoneme_discrimination.html';
+tetrisFrame.src='tetris_experiment.html';
+
+startButton.addEventListener('click',()=>{
+  const id=document.getElementById('participant').value.trim();
+  const order=Number(document.getElementById('order').value);
+  const speed=Number(document.getElementById('speed').value);
+  if(!id){document.getElementById('participant').reportValidity();return;}
+  if(!Number.isSafeInteger(order)||order<1||!Number.isInteger(speed)||speed<100||speed>10000){
+    message.textContent='Enter a positive block position and a gravity speed between 100 and 10000 ms/cell.';
+    return;
+  }
+  const p=phonemeFrame.contentDocument,t=tetrisFrame.contentDocument;
+  p.getElementById('participant').value=id;
+  t.getElementById('participant').value=id;
+  t.getElementById('order').value=order;
+  t.getElementById('speed').value=speed;
+  // Start both original tasks from the same user click; each keeps its own 180-second clock.
+  p.getElementById('start').click();
+  t.getElementById('start').click();
+  p.activeElement?.blur();t.activeElement?.blur();
+  document.activeElement?.blur();
+  running=true;startButton.disabled=true;startButton.textContent='Tasks running';
+  document.getElementById('waiting').hidden=true;
+  for(const input of document.querySelectorAll('.fields input'))input.disabled=true;
+  message.textContent='Both tasks running. S/D answer the phoneme pairs; arrows and Space control Tetris. Download the phoneme CSV when finished; Tetris downloads its CSV automatically.';
+  setTimeout(()=>{running=false;},180100);
+});
+</script>
+</body>
+</html>
