@@ -35,7 +35,6 @@
     <div class="fields">
       <label>Participant ID<input id="participant" required autocomplete="off" placeholder="e.g., P001"></label>
       <label>Mental rotation trials<input id="trials" type="number" min="4" max="200" value="40"></label>
-      <label>Practice trials<input id="practice" type="number" min="0" max="20" value="4"></label>
       <label>Block order position<input id="order" type="number" min="1" step="1" value="1"></label>
       <label>Gravity drop speed (ms/cell)<input id="speed" type="number" min="100" max="10000" step="1" value="800"></label>
       <button id="start" disabled>Loading tasks…</button>
@@ -77,189 +76,138 @@
   `;
   const ready = {rotation:false,tetris:false};
 
-  // Forward real key events between same-origin frames. The previous version
-  // attached some listeners before the iframe documents existed and dispatched
-  // to document, which missed handlers attached to window/body.
-  function forwardKeys(sourceWindow, destinationFrame, predicate) {
-    sourceWindow.addEventListener('keydown', event => {
-      if (!predicate(event)) return;
-      if (['INPUT','TEXTAREA','SELECT'].includes(event.target?.tagName) || event.target?.isContentEditable) return;
-      if (event.code.startsWith('Arrow') || event.code === 'Space') event.preventDefault();
-      const destination = destinationFrame.contentDocument;
-      if (!destination) return;
-      const target = destination.activeElement || destination.body || destination;
-      target.dispatchEvent(new KeyboardEvent('keydown', {
-        key:event.key, code:event.code, location:event.location,
-        repeat:event.repeat, bubbles:true, cancelable:true
-      }));
-    });
-    sourceWindow.addEventListener('keyup', event => {
-      if (!predicate(event)) return;
-      const destination = destinationFrame.contentDocument;
-      if (!destination) return;
-      const target = destination.activeElement || destination.body || destination;
-      target.dispatchEvent(new KeyboardEvent('keyup', {
-        key:event.key, code:event.code, location:event.location,
-        bubbles:true, cancelable:true
-      }));
-    });
+  // Route keyboard input explicitly. A key pressed while focus is in either
+  // iframe does not bubble to the parent, so listen on the parent and both
+  // child windows. S/D go only to mental rotation; arrows/Space go only to Tetris.
+  const bridgeInstalled = new WeakSet();
+  const rotationCodes = new Set(['KeyS','KeyD']);
+  const tetrisCodes = new Set(['ArrowLeft','ArrowRight','ArrowUp','ArrowDown','Space']);
+
+  function dispatchToFrame(frame, event) {
+    const win = frame.contentWindow, doc = frame.contentDocument;
+    if (!win || !doc) return;
+    const init = {
+      key:event.key, code:event.code, location:event.location,
+      repeat:event.repeat, bubbles:true, cancelable:true
+    };
+    // Dispatch once to the child window. It bubbles through the child document,
+    // which covers handlers installed on window, document, or body.
+    const bridged = new KeyboardEvent(event.type, init);
+    Object.defineProperty(bridged, '__dualTaskBridge', {value:true});
+    win.dispatchEvent(bridged);
+  }
+
+  function installBridgeOn(win) {
+    if (!win || bridgeInstalled.has(win)) return;
+    bridgeInstalled.add(win);
+    win.addEventListener('keydown', event => {
+      if (event.__dualTaskBridge) return;
+      if (rotationCodes.has(event.code)) {
+        event.preventDefault();
+        dispatchToFrame(rotationFrame, event);
+      } else if (tetrisCodes.has(event.code)) {
+        event.preventDefault();
+        dispatchToFrame(tetrisFrame, event);
+      }
+    }, true);
+    win.addEventListener('keyup', event => {
+      if (event.__dualTaskBridge) return;
+      if (rotationCodes.has(event.code)) dispatchToFrame(rotationFrame, event);
+      else if (tetrisCodes.has(event.code)) dispatchToFrame(tetrisFrame, event);
+    }, true);
   }
 
   function installBridges() {
-    if (window.__dualTaskBridgesInstalled) return;
-    const rotationWindow = rotationFrame.contentWindow;
-    const tetrisWindow = tetrisFrame.contentWindow;
-    if (!rotationWindow || !tetrisWindow) return;
-    window.__dualTaskBridgesInstalled = true;
-    forwardKeys(window, tetrisFrame, e => ['ArrowLeft','ArrowRight','ArrowUp','ArrowDown','Space'].includes(e.code));
-    forwardKeys(window, rotationFrame, e => ['KeyS','KeyD'].includes(e.code));
-    forwardKeys(rotationWindow, tetrisFrame, e => ['ArrowLeft','ArrowRight','ArrowUp','ArrowDown','Space'].includes(e.code));
-    forwardKeys(tetrisWindow, rotationFrame, e => ['KeyS','KeyD'].includes(e.code));
+    installBridgeOn(window);
+    installBridgeOn(rotationFrame.contentWindow);
+    installBridgeOn(tetrisFrame.contentWindow);
   }
 
-  // Each mental-rotation pair stays visible for six seconds. S/D is captured
-  // without submitting immediately; the original task receives one answer
-  // only when the six-second window expires.
+  // Keep each mental-rotation pair on screen for a fixed six-second window.
+  // Responses are captured, then committed only when that window expires.
   let rotationController = null;
   let rotationEndTimer = null;
-
   function installRotationTiming() {
     const doc = rotationFrame.contentDocument;
-    const win = rotationFrame.contentWindow;
-    if (!doc || !win || rotationController) return;
-
-    const state = {
-      running:false, ended:false, signature:'',
-      response:null, timer:null, poll:null, committing:false
-    };
+    if (!doc || rotationController) return;
+    const state = {running:false, ended:false, trialStarted:0, signature:'', response:null, timer:null, observer:null, stopTimer:null, committing:false};
     rotationController = state;
-
-    const answerButtons = () => [...doc.querySelectorAll('button,[role="button"]')]
-      .filter(el => {
-        const text = `${el.id} ${el.className} ${el.textContent}`.toLowerCase();
-        return !el.disabled && /same|different|identical|rotated|key.?s|key.?d/.test(text);
-      });
-
+    const answerButtons = () => [...doc.querySelectorAll('button,[role="button"]')].filter(el => {
+      const text = `${el.id} ${el.className} ${el.textContent}`.toLowerCase();
+      return /same|different|identical|rotated|key.?s|key.?d/.test(text) && !el.disabled;
+    });
+    const answerFor = key => answerButtons().find(el => {
+      const text = `${el.id} ${el.className} ${el.textContent}`.toLowerCase();
+      return key === 's' ? /same|identical|key.?s/.test(text) : /different|rotated|key.?d/.test(text);
+    });
+    const stimulus = () => doc.querySelector('.stimulus-area,.stimulusArea,.stage,[id*="stimulus" i]') || doc.body;
+    const signature = () => {
+      const el = stimulus();
+      return `${el.innerHTML}|${el.querySelector?.('img')?.src || ''}|${el.querySelector?.('canvas')?.toDataURL?.() || ''}`;
+    };
     const answerKey = el => {
       const text = `${el.id} ${el.className} ${el.textContent}`.toLowerCase();
       return /same|identical|key.?s/.test(text) ? 's' : 'd';
     };
-
-    const stimulus = () =>
-      doc.querySelector('.stimulus-area,.stimulusArea,.stage,[id*="stimulus" i]') ||
-      doc.body;
-
-    const signature = () => {
-      const el = stimulus();
-      let canvasData = '';
-      try {
-        canvasData = [...el.querySelectorAll('canvas')]
-          .map(canvas => canvas.toDataURL()).join('|');
-      } catch {}
-      return `${el.innerHTML}|${el.querySelector?.('img')?.src || ''}|${canvasData}`;
-    };
-
-    const answerButton = key => answerButtons().find(el => answerKey(el) === key);
-
-    const incorrectAnswer = () => {
-      // If the task exposes its answer in markup, deliberately choose the
-      // opposite. Otherwise D is submitted as the no-response answer.
-      const marked = answerButtons().find(el =>
-        /correct|answer|target/i.test(
-          `${el.dataset.correct} ${el.dataset.answer} ${el.getAttribute('aria-label') || ''}`
-        )
-      );
-      return marked ? (answerKey(marked) === 's' ? 'd' : 's') : 'd';
-    };
-
-    const submitAtWindowEnd = key => {
-      if (state.ended) return;
+    const commit = key => {
+      if (!key || state.committing || state.ended) return;
       state.committing = true;
-
-      const button = answerButton(key);
+      const button = answerFor(key);
       if (button) button.click();
-
-      // Fallback for tasks whose response listener is keyboard-based.
-      const target = doc.body || doc.documentElement;
-      const init = {
-        key, code:key === 's' ? 'KeyS' : 'KeyD',
-        bubbles:true, cancelable:true
-      };
-      target.dispatchEvent(new KeyboardEvent('keydown', init));
-      target.dispatchEvent(new KeyboardEvent('keyup', init));
-
+      else doc.dispatchEvent(new KeyboardEvent('keydown',{key,code:key === 's' ? 'KeyS' : 'KeyD',bubbles:true,cancelable:true}));
       state.committing = false;
     };
-
-    const beginTrial = nextSignature => {
-      if (!state.running || state.ended || !nextSignature ||
-          nextSignature === state.signature) return;
-
+    const beginTrial = sig => {
+      if (!state.running || state.ended || !sig || sig === state.signature) return;
       clearTimeout(state.timer);
-      state.signature = nextSignature;
+      state.signature = sig;
       state.response = null;
-
+      state.trialStarted = performance.now();
       state.timer = setTimeout(() => {
-        if (!state.ended) {
-          submitAtWindowEnd(state.response || incorrectAnswer());
+        if (state.ended) return;
+        // A missing response is scored as an incorrect response. If the task
+        // exposes the correct answer in markup, choose the opposite; otherwise
+        // use D, matching the task's normal response path.
+        let key = state.response;
+        if (!key) {
+          const markedCorrect = answerButtons().find(el => /correct|answer|target/.test(`${el.dataset.correct} ${el.dataset.answer} ${el.getAttribute('aria-label') || ''}`.toLowerCase()));
+          key = markedCorrect ? (answerKey(markedCorrect) === 's' ? 'd' : 's') : 'd';
         }
+        commit(key);
       }, 6000);
     };
-
-    const captureKey = event => {
+    const keyHandler = event => {
       if (!state.running || state.ended || state.committing) return;
       const key = event.key?.toLowerCase();
       if (key !== 's' && key !== 'd') return;
-
       event.preventDefault();
       event.stopImmediatePropagation();
       state.response = key;
     };
-
-    // Listen in both places because the original task may attach handlers to
-    // window rather than document.
-    doc.addEventListener('keydown', captureKey, true);
-    win.addEventListener('keydown', captureKey, true);
-
-    doc.addEventListener('click', event => {
+    const clickHandler = event => {
       if (!state.running || state.ended || state.committing) return;
       const button = event.target.closest?.('button,[role="button"]');
       if (!button || !answerButtons().includes(button)) return;
-
       event.preventDefault();
       event.stopImmediatePropagation();
       state.response = answerKey(button);
-    }, true);
-
-    // Polling detects canvas/image stimulus changes even when no DOM mutation
-    // occurs after a response.
-    state.poll = setInterval(() => beginTrial(signature()), 50);
-
-    state.start = () => {
-      state.running = true;
-      state.ended = false;
-      state.signature = '';
-      state.response = null;
-      beginTrial(signature());
     };
-
+    doc.addEventListener('keydown', keyHandler, true);
+    doc.addEventListener('click', clickHandler, true);
+    state.observer = new MutationObserver(() => beginTrial(signature()));
+    state.observer.observe(doc.body, {subtree:true, childList:true, characterData:true, attributes:true, attributeFilter:['src','class','style']});
+    state.start = () => { state.running = true; state.ended = false; state.signature = ''; setTimeout(() => beginTrial(signature()), 50); };
     state.end = () => {
       if (state.ended) return;
-      state.ended = true;
-      state.running = false;
-      clearTimeout(state.timer);
-      clearInterval(state.poll);
-      answerButtons().forEach(button => { button.disabled = true; });
-
-      const note = doc.createElement('div');
-      note.textContent = 'Mental rotation task ended after 3 minutes.';
-      note.style.cssText =
-        'position:fixed;inset:0;background:#101827eF;display:grid;' +
-        'place-items:center;color:white;font:700 22px system-ui;z-index:99999;';
+      state.ended = true; state.running = false; clearTimeout(state.timer); state.observer?.disconnect();
+      doc.querySelectorAll('button,[role="button"]').forEach(el => { if (answerButtons().includes(el)) el.disabled = true; });
+      const finish = [...doc.querySelectorAll('button,a,[role="button"]')].find(el => /finish|end|complete|download results|save results/i.test(el.textContent || ''));
+      if (finish && !finish.disabled) finish.click();
+      const note = doc.createElement('div'); note.textContent = 'Mental rotation task ended after 3 minutes.';
+      note.style.cssText = 'position:fixed;inset:0;background:#101827eF;display:grid;place-items:center;color:white;font:700 22px system-ui;z-index:99999;';
       doc.body.append(note);
     };
   }
-
   function loaded(name, frame, css) {
     const doc = frame.contentDocument;
     const expected = name === 'rotation' ? 'startBtn' : 'start';
@@ -293,14 +241,15 @@
       message.textContent = 'Enter a positive block order position and a gravity speed between 100 and 10000 ms/cell.';
       return;
     }
-    if (!$('trials').checkValidity() || !$('practice').checkValidity()) {
-      message.textContent = 'Check the mental rotation trial and practice counts.';
+    if (!$('trials').checkValidity()) {
+      message.textContent = 'Check the mental rotation trial count.';
       return;
     }
     const m = rotationFrame.contentDocument, t = tetrisFrame.contentDocument;
     m.getElementById('participant').value = id;
     m.getElementById('trialCount').value = $('trials').value;
-    m.getElementById('practiceCount').value = $('practice').value;
+    // Practice trials are intentionally disabled for this dual-task version.
+    m.getElementById('practiceCount').value = 0;
     t.getElementById('participant').value = id;
     t.getElementById('order').value = order;
     t.getElementById('speed').value = speed;
@@ -312,7 +261,7 @@
     start.disabled = true;
     start.textContent = 'Tasks running';
     for (const input of document.querySelectorAll('.fields input')) input.disabled = true;
-    message.textContent = 'Both tasks started together. Mental rotation continues at your pace; Tetris ends automatically after three minutes. Download each task’s CSV from its own panel.';
+    message.textContent = 'Both tasks started together. Mental rotation and Tetris run simultaneously for three minutes. Download each task’s CSV from its own panel.';
   });
 </script>
 </body>
