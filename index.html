@@ -5,7 +5,32 @@
 <title>Multiple Resource Theory Experiment: Tetris, Phoneme Discrimination, and Mental Rotation</title>
 <style>
 :root{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;color-scheme:dark;background:#0b1224;color:#eef4ff}*{box-sizing:border-box}body{margin:0}.shell{max-width:1430px;margin:auto;padding:22px}h1{margin:0 0 8px}h2{margin:8px 0}p{line-height:1.5;color:#c1d0e6}.card,.pane{background:#18243c;border:1px solid #354967;border-radius:13px;padding:18px;margin:12px 0}.hidden{display:none!important}.fields{display:flex;flex-wrap:wrap;gap:13px;margin:18px 0}.fields label{display:grid;gap:5px;font-size:14px;font-weight:700;min-width:170px}input{padding:10px;background:#0d182c;color:#fff;border:1px solid #597092;border-radius:7px;font-size:16px}input[readonly]{opacity:.8}button{cursor:pointer;background:#126a91;color:white;border:1px solid #35c2df;border-radius:8px;padding:11px 17px;font-weight:700;font-size:15px}button.secondary{background:#263851;border-color:#6684a8}button:disabled{opacity:.45;cursor:not-allowed}.status{padding:10px 12px;background:#102038;border-radius:7px;min-height:42px}.warning{color:#ffb9a7}.columns{display:flex;justify-content:center;gap:18px;align-items:flex-start}.columns .pane{flex:1;min-width:0;text-align:center}.columns.single .pane{max-width:750px}.figures{display:flex;justify-content:center;gap:12px;margin:18px 0}.figures>div{background:#edf0f7;border-radius:9px;padding:6px;min-width:0;flex:1;max-width:285px}.figures img{width:100%;height:210px;object-fit:contain;display:block}.key{border:1px solid #7994b6;border-radius:5px;padding:2px 6px}#responseText,#audioStatus{min-height:28px;font-weight:700}.intro{padding:0;overflow:hidden;max-width:1050px;margin:22px auto;border-color:#477189;box-shadow:0 18px 56px #0004}.intro-hero{padding:34px 38px 30px;background:linear-gradient(118deg,#123751 0%,#1b3153 65%,#263a60 100%);border-bottom:1px solid #466079}.intro-eyebrow{display:inline-block;padding:6px 12px;border:1px solid #65cbd455;border-radius:999px;color:#9fe7eb;font-size:12px;font-weight:800;letter-spacing:.09em;text-transform:uppercase}.intro h2{font-size:clamp(26px,3vw,38px);line-height:1.15;margin:16px 0 10px}.intro-hero p{font-size:16px;max-width:710px;margin:0}.intro-body{padding:28px 38px 34px}.intro-body h3{font-size:17px;margin:0 0 14px}.task-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}.task-card{background:#112039;border:1px solid #364e70;border-radius:12px;padding:18px;min-width:0}.task-card h4{font-size:17px;margin:0 0 9px}.task-card p{margin:0 0 13px;font-size:14px}.task-card p:last-child{margin-bottom:0}.intro-keyline{color:#e7f4ff!important}.intro-reminder{display:flex;gap:12px;align-items:flex-start;padding:14px 17px;background:#123344;border:1px solid #3c7788;border-radius:10px;margin:20px 0;color:#d3f6f5;line-height:1.45}.intro-reminder strong{color:#fff}.intro-actions{display:flex;justify-content:flex-end}#startPractice{padding:13px 22px}@media(max-width:760px){.task-grid{grid-template-columns:1fr}.intro-hero,.intro-body{padding:24px}.intro-actions button{width:100%}}body.block-running .shell{padding:8px 14px}body.block-running header,body.block-running footer{display:none}#board{display:block;width:auto;height:min(72dvh,600px,calc(100dvh - 175px));max-width:100%;margin:0 auto;border:2px solid #6b82a5;background:#101729}#next{vertical-align:middle;background:#171e33}.tetris-playfield{display:flex;justify-content:center;align-items:flex-start;gap:16px;margin:8px auto}.tetris-sidebar{text-align:left;min-width:150px}.tetris-sidebar .muted{max-width:165px}.tetris-controls{display:grid;gap:6px;margin:8px 0;text-align:left}.control-row{display:flex;align-items:center;gap:8px;font-size:13px;color:#c1d0e6}.control-key{display:inline-flex;align-items:center;justify-content:center;flex:none;width:33px;min-height:30px;border:1px solid #90abc9;border-bottom-width:3px;border-radius:6px;background:#253853;color:#fff;font-size:19px;font-weight:700;line-height:1}.control-key.space{width:64px;font-size:11px;letter-spacing:.05em}#running>.card{padding:10px 15px;margin:6px 0}#running>.card h2{margin:0 0 4px}#running .pane{padding:12px;margin:6px 0}#running .pane h2{margin:0 0 5px}#running .pane p{margin:7px 0}#running #tetrisPane .metrics{gap:10px}.metrics{display:flex;gap:16px;justify-content:center;align-items:center;flex-wrap:wrap}.muted{font-size:13px;color:#b5c5df}.sequence{line-height:1.7}.progress{height:8px;background:#101b30;border-radius:9px;overflow:hidden;margin:12px 0}.progress>div{height:100%;width:0;background:#54ccdf}.footer{margin-top:20px;color:#acbdd7;font-size:13px}@media(max-width:700px){.columns{flex-direction:column}.columns .pane{width:100%}.figures img{height:150px}}
-.form-layout{max-width:850px;margin:18px auto}.form-layout h2{margin-top:0}.form-layout fieldset{border:1px solid #597092;border-radius:9px;margin:16px 0;padding:14px 17px}.form-layout legend{font-weight:700;padding:0 6px}.form-layout label.field{display:grid;gap:6px;margin:15px 0;font-weight:650}.form-layout select,.form-layout input{max-width:100%;padding:10px;background:#0d182c;color:#fff;border:1px solid #597092;border-radius:7px;font-size:16px}.form-layout select{width:100%}.form-layout .check{display:flex;align-items:flex-start;gap:10px;margin:11px 0;line-height:1.45}.form-layout .check input{flex:none;margin:3px 0}.form-layout .actions{display:flex;flex-wrap:wrap;gap:12px;margin-top:19px}.form-layout .note{padding:12px;background:#102038;border-radius:8px}.form-layout .error{color:#ffb9a7;font-weight:700}
+.form-layout{max-width:850px;margin:18px auto}.form-layout h2{margin-top:0}.form-layout fieldset{border:1px solid #597092;border-radius:9px;margin:16px 0;padding:14px 17px}.form-layout legend{font-weight:700;padding:0 6px}.form-layout label.field{display:grid;gap:6px;margin:15px 0;font-weight:650}.form-layout select,.form-layout input{max-width:100%;padding:10px;background:#0d182c;color:#fff;border:1px solid #597092;border-radius:7px;font-size:16px}.form-layout select{width:100%}.form-layout .check{display:flex;align-items:flex-start;gap:10px;margin:11px 0;line-height:1.45}.form-layout .check input{flex:none;margin:3px 0}.form-layout .actions{display:flex;flex-wrap:wrap;gap:12px;margin-top:19px}.form-layout .note{padding:12px;background:#102038;border-radius:8px}.form-layout .error{color:#ffb9a7;font-weight:700}/* NASA-TLX uses the same hero, cards, form controls and accent as the experiment instructions. */
+#tlx{max-width:1050px}
+#tlx .intro-hero p{max-width:820px}
+#tlx .intro-body{padding-top:26px}
+#tlx h3{font-size:20px;margin:0 0 8px}
+#tlx .tlx-note{margin:17px 0 20px}
+#tlx .tlx-step{display:flex;justify-content:space-between;align-items:center;gap:12px;color:#a5dae4;font-size:13px;font-weight:750;letter-spacing:.04em;text-transform:uppercase}
+#tlx .progress{margin:10px 0 23px}
+#tlx .tlx-scale-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;margin:18px 0}
+#tlx .tlx-scale{background:#112039;border:1px solid #364e70;border-radius:12px;padding:18px;min-width:0}
+#tlx .tlx-scale:focus-within{border-color:#54ccdf}
+#tlx .tlx-scale label{display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:6px;font-weight:750;font-size:17px}
+#tlx .tlx-scale p{margin:9px 0 16px;font-size:14px;line-height:1.5}
+#tlx .tlx-scale input[type="range"]{display:block;width:100%;max-width:none;padding:0;accent-color:#54ccdf;cursor:pointer}
+#tlx .tlx-ends{display:flex;justify-content:space-between;color:#d8e9fc;font-size:14px;margin-top:7px}
+#tlx .tlx-value{color:#8de3ef;font-weight:750;font-size:14px}
+#tlx .tlx-pair-card{background:#112039;border:1px solid #364e70;border-radius:12px;margin:18px 0;padding:19px}
+#tlx .tlx-pair-card legend{font-size:17px}
+#tlx .tlx-option{display:flex;align-items:center;min-height:58px;padding:12px 15px;margin:10px 0;border:1px solid #597092;border-radius:9px;background:#18243c;cursor:pointer;font-weight:700}
+#tlx .tlx-option:hover,#tlx .tlx-option:focus-within{border-color:#8ccdda}
+#tlx .tlx-option:has(input:checked){background:#124659;border-color:#54ccdf;box-shadow:0 0 0 1px #54ccdf}
+#tlx .tlx-option input{flex:none;margin:0 12px 0 0;accent-color:#54ccdf;width:18px;height:18px}
+#tlx .actions{justify-content:flex-end}
+#tlx .tlx-pair-actions{justify-content:space-between}
+@media(max-width:760px){#tlx .tlx-scale-grid{grid-template-columns:1fr}#tlx .tlx-pair-actions button{flex:1}#tlx .intro-body{padding:24px}}
+
 </style>
 </head>
 <body><main class="shell">
@@ -31,11 +56,11 @@
 <h2 id="consentTitle">Information and consent to participate</h2>
 <p class="note">Please read this information before deciding whether to participate. Keep a copy of this page if you want a record of the information provided.</p>
 <p><strong>Study purpose:</strong> This study examines how performance changes when Tetris is performed alone or alongside a visual mental-rotation or auditory sound-discrimination task.</p>
-<p><strong>What you will do:</strong> Answer two brief eligibility questions and a demographic survey; practice Tetris, phoneme discrimination, and mental rotation for one minute each; then complete five three-minute test blocks, some with two tasks at once. You will respond with the keyboard and hear sounds through headphones. The session takes about 20–30 minutes, including setup and instructions.</p>
+<p><strong>What you will do:</strong> Answer two brief eligibility questions and a demographic survey; practice Tetris, phoneme discrimination, and mental rotation for one minute each; then complete five three-minute test blocks, some with two tasks at once. You will respond with the keyboard and hear sounds through headphones. After the five test blocks, you will complete the NASA-TLX workload survey (six ratings and 15 comparisons). The session takes about 25–35 minutes, including setup and instructions.</p>
 <p><strong>Eligibility:</strong> You must be 18 or older, have normal or corrected-to-normal vision (with glasses or contact lenses if needed), and report typical hearing without hearing aids. You must also be able to use a keyboard for the tasks. After consenting, you will answer two required eligibility questions; if you do not meet both criteria, or are unsure, the session will end before the demographic survey or tasks. Eligibility is based on your answers, not a clinical test. Do not use audio at an uncomfortable volume.</p>
 <p><strong>Risks and benefits:</strong> You may experience minor fatigue, frustration, or eye/ear discomfort. You may stop at any time; there is no direct benefit promised. Keep volume moderate, take breaks between blocks if needed, and stop if uncomfortable.</p>
 <p><strong>Voluntary participation:</strong> Participation is optional. You may decline or stop without penalty. Before sharing the downloaded CSV, you can close this tab and delete the file to withhold your results. If you have already shared the file, contact the researcher with your participant ID to ask whether your data can still be withdrawn; removal may not be possible after data have been combined or de-identified.</p>
-<p><strong>Data and privacy:</strong> This page does not ask for your name. For participants who meet the eligibility criteria, it records your participant ID, eligibility answers, survey responses, task performance, and timestamps in a CSV downloaded to this device; ineligible participants’ answers are not downloaded or stored by this page; the page itself does not upload those data. If automatic counterbalancing is used, this browser stores your participant ID and sequence assignment locally. The CSV is not anonymous to anyone who can connect your participant ID to you; anyone who receives the file can read its contents. Do not put your name or email address in the participant ID or optional text answers. This page does not specify how a researcher will store, share, or retain a CSV you send them. Ask the researcher about those arrangements before sharing it, and do not participate until you have the information you need to decide.</p>
+<p><strong>Data and privacy:</strong> This page does not ask for your name. For participants who meet the eligibility criteria, it records your participant ID, eligibility answers, survey responses, NASA-TLX workload ratings and comparisons, task performance, and timestamps in a CSV downloaded to this device; ineligible participants’ answers are not downloaded or stored by this page; the page itself does not upload those data. If automatic counterbalancing is used, this browser stores your participant ID and sequence assignment locally. The CSV is not anonymous to anyone who can connect your participant ID to you; anyone who receives the file can read its contents. Do not put your name or email address in the participant ID or optional text answers. This page does not specify how a researcher will store, share, or retain a CSV you send them. Ask the researcher about those arrangements before sharing it, and do not participate until you have the information you need to decide.</p>
 <p><strong>Compensation:</strong> This website does not provide payment or course credit. If you were offered either separately, ask the researcher about the amount, eligibility, and what happens if you stop early before deciding whether to participate.</p>
 <p><strong>Questions about the study or your data:</strong> Joseph Brazina, <a href="mailto:josephbrazina@vt.edu">josephbrazina@vt.edu</a>. <strong>Questions or concerns about research participant rights:</strong> Virginia Tech Human Research Protection Program, <a href="mailto:irb@vt.edu">irb@vt.edu</a> or 540-231-3732. Listing this contact does not indicate that this study has received institutional review or approval.</p>
 <label class="check"><input id="consentAge" type="checkbox"> I confirm that I am at least 18 years old.</label>
@@ -121,7 +146,35 @@
 <section id="phonemePane" class="pane hidden"><h2>Phoneme discrimination</h2><p><strong>Wear headphones.</strong> Listen to both sounds, separated by 0.5 seconds.</p><div id="audioStatus" aria-live="polite">Listen and respond with S or D</div><p class="muted"><span class="key">S</span> same · <span class="key">D</span> different</p></section>
 <section id="tetrisPane" class="pane hidden"><h2>Tetris</h2><div class="metrics"><span>Lines: <b id="lines">0</b></span><span>Score: <b id="score">0</b></span></div><div class="tetris-playfield"><canvas id="board" width="300" height="600" aria-label="Tetris playfield"></canvas><div class="tetris-sidebar">Next piece:<br><canvas id="next" width="104" height="104" aria-label="Next piece"></canvas><div class="tetris-controls" aria-label="Tetris keyboard controls"><div class="control-row"><span class="control-key">↑</span><span>Rotate counterclockwise</span></div><div class="control-row"><span class="control-key">←</span><span>Move left</span></div><div class="control-row"><span class="control-key">→</span><span>Move right</span></div><div class="control-row"><span class="control-key">↓</span><span>Soft drop</span></div><div class="control-row"><span class="control-key space">SPACE</span><span>Hard drop to ghost</span></div></div></div></div></section>
 </div></section>
-<section id="finished" class="card hidden"><h2>Experiment complete</h2><p id="finishText"></p><button id="downloadAgain">Download combined CSV again</button><p class="muted">The combined CSV includes consent time, self-reported eligibility answers, and demographic responses on each row, practice and test blocks, task labels, every response or timeout, every Tetris placement/top-out (including successful hard drops and drop distance), and per-block summaries.</p></section>
+<section id="tlx" class="card intro form-layout hidden" aria-labelledby="tlxTitle">
+  <div class="intro-hero">
+    <span class="intro-eyebrow" id="tlxEyebrow">After the test blocks · Part 1 of 2</span>
+    <h2 id="tlxTitle">NASA Task Load Index (NASA-TLX)</h2>
+    <p>Think about the <strong>five test blocks</strong> you just completed—not the practice blocks. First rate your experience, then compare the factors that contributed to your workload. Your answers will be saved with your task results.</p>
+  </div>
+  <div class="intro-body">
+    <div id="tlxRatings">
+      <div class="tlx-step"><span>Workload ratings</span><span>Step 1 of 2</span></div>
+      <div class="progress" aria-hidden="true"><div style="width:50%"></div></div>
+      <h3>Rate your workload</h3>
+      <p class="note tlx-note">Rate each factor separately. Move each slider to record an answer, even if the midpoint is your choice. For Performance, <strong>Good is on the left and Poor is on the right.</strong></p>
+      <div id="tlxScales" class="tlx-scale-grid"></div>
+      <p id="tlxRatingError" class="error hidden" role="alert"></p>
+      <div class="actions"><button id="tlxToPairs" type="button">Continue to comparisons</button></div>
+    </div>
+    <div id="tlxPairs" class="hidden">
+      <div class="tlx-step"><span>Sources of workload</span><span>Step 2 of 2</span></div>
+      <div class="progress" aria-hidden="true"><div style="width:100%"></div></div>
+      <h3>Compare sources of workload</h3>
+      <p class="note tlx-note">For each pair, choose the factor that contributed <strong>more</strong> to your workload across the five test blocks, even if you gave it a lower rating. Complete all 15 comparisons.</p>
+      <p id="tlxPairCount" class="muted" aria-live="polite"></p>
+      <fieldset class="tlx-pair-card"><legend>Which contributed more to your workload?</legend><div id="tlxPairOptions"></div></fieldset>
+      <p id="tlxPairError" class="error hidden" role="alert"></p>
+      <div class="actions tlx-pair-actions"><button id="tlxPreviousPair" type="button" class="secondary">Previous comparison</button><button id="tlxNextPair" type="button">Next comparison</button></div>
+    </div>
+  </div>
+</section>
+<section id="finished" class="card hidden"><h2>Experiment and survey complete</h2><p id="finishText"></p><button id="downloadAgain">Download combined CSV again</button><p class="muted">The combined CSV includes demographics, consent and eligibility, task responses and block summaries, all six NASA-TLX ratings, all 15 pairwise choices, factor weights, and the raw and weighted workload scores.</p></section>
 
 </main>
 <script>
@@ -133,7 +186,7 @@ const CONDITIONS=['tetris','phoneme','mental','mental_tetris','phoneme_tetris'];
 const WILLIAMS=[0,1,4,2,3];
 const ORDERS=Array.from({length:5},(_,shift)=>WILLIAMS.map(x=>CONDITIONS[(x+shift)%5]));
 ORDERS.push(...ORDERS.map(order=>[...order].reverse()));
-const HEADERS=['participant_id','consent_timestamp','age_years','sex_assigned_at_birth','gender_identity','gender_self_description','race','hispanic_latino_spanish_origin','education','handedness','vision','hearing','tetris_experience','sequence_number','block_id','block_position','condition','phase','task','event_type','trial','timestamp','elapsed_ms','planned_onset_ms','first_level','second_level','figure','rotation_index','left_image','right_image','correct_answer','response','correct','timeout','rt_ms','drop_speed_ms','piece_index','piece_type','spawn_timestamp','status','placement_method','hard_drop_distance','hard_drop_count','hard_drop_rate','pieces_placed','lines_cleared','total_lines','lines_per_minute','holes_per_piece','placement_time_ms','mean_stack_height','score','game_over_count'];
+const HEADERS=['participant_id','consent_timestamp','age_years','sex_assigned_at_birth','gender_identity','gender_self_description','race','hispanic_latino_spanish_origin','education','handedness','vision','hearing','tetris_experience','sequence_number','block_id','block_position','condition','phase','task','event_type','trial','timestamp','elapsed_ms','planned_onset_ms','first_level','second_level','figure','rotation_index','left_image','right_image','correct_answer','response','correct','timeout','rt_ms','drop_speed_ms','piece_index','piece_type','spawn_timestamp','status','placement_method','hard_drop_distance','hard_drop_count','hard_drop_rate','pieces_placed','lines_cleared','total_lines','lines_per_minute','holes_per_piece','placement_time_ms','mean_stack_height','score','game_over_count','tlx_dimension','tlx_rating','tlx_weight','tlx_weighted_rating','tlx_pair_left','tlx_pair_right','tlx_pair_choice','tlx_raw_score','tlx_weighted_score'];
 let participant='',consentTimestamp='',demographicData={},seqNumber=0,plan=[],step=-1,block=null,rows=[],audioCtx=null,audio={},pairBuffers=new Map(),audioSource=null;
 let imageDeck=[],imageCache=new Map(),audioReady=false,blockToken=0;
 const practice=[{phase:'practice',condition:'tetris',duration:PRACTICE_MS},{phase:'practice',condition:'phoneme',duration:PRACTICE_MS},{phase:'practice',condition:'mental',duration:PRACTICE_MS}];
@@ -193,10 +246,94 @@ if(hasMental(entry.condition)){block.rotation={trials:imageDeck,index:-1,respons
 block.timer=setInterval(tick,15);requestAnimationFrame(animation);tick()}
 function animation(now){if(!block?.active)return;if(now>=block.end){tick();return}if(block.tetris)tetrisFrame(block.tetris,now);requestAnimationFrame(animation)}
 function tick(){if(!block?.active)return;const now=performance.now();updateRotation(now);updatePhoneme(now);if(now>=block.end)finishBlock()}
-function finishBlock(){if(!block?.active)return;clearInterval(block.timer);updateRotation(block.end);updatePhoneme(block.end);stopAudio();if(block.tetris)finishTetris(block.tetris);block.active=false;log('experiment','block_summary',{status:'complete',planned_onset_ms:block.duration});$('running').classList.add('hidden');document.body.classList.remove('block-running');step++;if(step<plan.length)showBetween();else finishExperiment()}
+function finishBlock(){if(!block?.active)return;clearInterval(block.timer);updateRotation(block.end);updatePhoneme(block.end);stopAudio();if(block.tetris)finishTetris(block.tetris);block.active=false;log('experiment','block_summary',{status:'complete',planned_onset_ms:block.duration});$('running').classList.add('hidden');document.body.classList.remove('block-running');step++;if(step<plan.length)showBetween();else startTLX()}
 function csvValue(value){return '"'+String(value??'').replaceAll('"','""')+'"'}
 function downloadCSV(){const csv='\ufeff'+[HEADERS.join(','),...rows.map(row=>HEADERS.map(k=>csvValue(row[k])).join(','))].join('\r\n')+'\r\n',url=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'})),a=document.createElement('a');a.href=url;a.download=`${participant.replace(/[^a-z0-9_-]/gi,'_')}_all_conditions.csv`;document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),30000)}
-function finishExperiment(){$('between').classList.add('hidden');$('finished').classList.remove('hidden');$('finishText').textContent=`All three practice and five test blocks are complete. ${rows.length} data rows were recorded. The combined CSV is downloading now.`;downloadCSV()}
+const TLX_FACTORS=[
+ {key:'mental_demand',name:'Mental Demand',low:'Low',high:'High',description:'How much mental and perceptual activity was required (thinking, deciding, calculating, remembering, looking, searching)? Was the task easy or demanding, simple or complex?'},
+ {key:'physical_demand',name:'Physical Demand',low:'Low',high:'High',description:'How much physical activity was required (pushing, pulling, turning, controlling, activating)? Was the task restful or laborious?'},
+ {key:'temporal_demand',name:'Temporal Demand',low:'Low',high:'High',description:'How much time pressure did you feel because of the pace of the task? Was the pace slow and leisurely or rapid and frantic?'},
+ {key:'performance',name:'Performance',low:'Good',high:'Poor',description:'How successful do you think you were in accomplishing the goals of the task? How satisfied were you with your performance? Good is on the left; poor is on the right.'},
+ {key:'effort',name:'Effort',low:'Low',high:'High',description:'How hard did you have to work, mentally and physically, to accomplish your level of performance?'},
+ {key:'frustration',name:'Frustration',low:'Low',high:'High',description:'How insecure, discouraged, irritated, stressed, or annoyed versus secure, gratified, content, relaxed, and complacent did you feel?'}
+];
+// Comparison-card order follows Appendix B of the NASA-TLX paper-and-pencil package.
+const TLX_PAIRS=[
+ ['effort','performance'],['temporal_demand','frustration'],['temporal_demand','effort'],
+ ['physical_demand','frustration'],['performance','frustration'],['physical_demand','temporal_demand'],
+ ['physical_demand','performance'],['temporal_demand','mental_demand'],['frustration','effort'],
+ ['performance','mental_demand'],['performance','temporal_demand'],['mental_demand','effort'],
+ ['mental_demand','physical_demand'],['effort','physical_demand'],['frustration','mental_demand']
+];
+const tlxRatings={},tlxChoices=Array(TLX_PAIRS.length).fill(null);
+let tlxPairIndex=0;
+function startTLX(){
+ $('between').classList.add('hidden');$('tlx').classList.remove('hidden');
+ const scales=$('tlxScales');
+ for(const factor of TLX_FACTORS){
+  const group=document.createElement('div');
+  group.className='tlx-scale';
+  group.innerHTML=`<label for="tlx_${factor.key}">${factor.name} <span class="tlx-value" id="tlxValue_${factor.key}">Not rated</span></label><p>${factor.description}</p><input id="tlx_${factor.key}" type="range" min="0" max="100" step="5" value="50" aria-describedby="tlxEnds_${factor.key}"><div class="tlx-ends" id="tlxEnds_${factor.key}"><span>${factor.low} (0)</span><span>${factor.high} (100)</span></div>`;
+  const slider=group.querySelector('input');
+  slider.addEventListener('input',()=>{tlxRatings[factor.key]=Number(slider.value);$('tlxValue_'+factor.key).textContent=slider.value+' / 100';$('tlxRatingError').classList.add('hidden')});
+  scales.append(group);
+ }
+ window.scrollTo(0,0);
+}
+function showTLXPair(){
+ const [left,right]=TLX_PAIRS[tlxPairIndex];
+ $('tlxPairCount').textContent=`Comparison ${tlxPairIndex+1} of ${TLX_PAIRS.length}`;
+ const options=$('tlxPairOptions');
+ options.replaceChildren();
+ for(const key of [left,right]){
+  const label=document.createElement('label');
+  label.className='tlx-option';
+  const radio=document.createElement('input');
+  radio.type='radio';radio.name='tlxComparison';radio.value=key;radio.checked=tlxChoices[tlxPairIndex]===key;
+  radio.addEventListener('change',()=>{$('tlxPairError').classList.add('hidden')});
+  label.append(radio,' '+TLX_FACTORS.find(f=>f.key===key).name);
+  options.append(label);
+ }
+ $('tlxPreviousPair').disabled=tlxPairIndex===0;
+ $('tlxNextPair').textContent=tlxPairIndex===TLX_PAIRS.length-1?'Finish and download CSV':'Next comparison';
+ window.scrollTo(0,0);
+}
+$('tlxToPairs').addEventListener('click',()=>{
+ const missing=TLX_FACTORS.find(f=>!(f.key in tlxRatings));
+ if(missing){
+  $('tlxRatingError').textContent='Please move every slider to record all six ratings.';
+  $('tlxRatingError').classList.remove('hidden');
+  $('tlx_'+missing.key).focus();return;
+ }
+ $('tlxRatings').classList.add('hidden');$('tlxPairs').classList.remove('hidden');
+ $('tlxEyebrow').textContent='After the test blocks · Part 2 of 2';
+ showTLXPair();
+});
+$('tlxPreviousPair').addEventListener('click',()=>{
+ const selected=document.querySelector('input[name="tlxComparison"]:checked');
+ if(selected)tlxChoices[tlxPairIndex]=selected.value;
+ tlxPairIndex--;showTLXPair();
+});
+$('tlxNextPair').addEventListener('click',()=>{
+ const selected=document.querySelector('input[name="tlxComparison"]:checked');
+ if(!selected){$('tlxPairError').textContent='Please select one factor before continuing.';$('tlxPairError').classList.remove('hidden');return}
+ tlxChoices[tlxPairIndex]=selected.value;
+ if(tlxPairIndex<TLX_PAIRS.length-1){tlxPairIndex++;showTLXPair();return}
+ finishExperiment();
+});
+function finishExperiment(){
+ const weights=Object.fromEntries(TLX_FACTORS.map(f=>[f.key,0]));
+ for(const choice of tlxChoices)weights[choice]++;
+ const rawScore=+(TLX_FACTORS.reduce((sum,f)=>sum+tlxRatings[f.key],0)/6).toFixed(2);
+ const weightedScore=+(TLX_FACTORS.reduce((sum,f)=>sum+tlxRatings[f.key]*weights[f.key],0)/15).toFixed(2);
+ const common={participant_id:participant,consent_timestamp:consentTimestamp,...demographicData,sequence_number:seqNumber,condition:'all_five_test_blocks',phase:'post_test',task:'nasa_tlx'};
+ for(const f of TLX_FACTORS)rows.push({...common,event_type:'tlx_rating',timestamp:new Date().toISOString(),tlx_dimension:f.key,tlx_rating:tlxRatings[f.key],tlx_weight:weights[f.key],tlx_weighted_rating:tlxRatings[f.key]*weights[f.key]});
+ TLX_PAIRS.forEach(([left,right],i)=>rows.push({...common,event_type:'tlx_comparison',trial:i+1,timestamp:new Date().toISOString(),tlx_pair_left:left,tlx_pair_right:right,tlx_pair_choice:tlxChoices[i]}));
+ rows.push({...common,event_type:'tlx_summary',timestamp:new Date().toISOString(),tlx_raw_score:rawScore,tlx_weighted_score:weightedScore});
+ $('tlx').classList.add('hidden');$('finished').classList.remove('hidden');
+ $('finishText').textContent=`All three practice and five test blocks, plus the NASA-TLX survey, are complete. ${rows.length} data rows were recorded. The combined CSV is downloading now.`;
+ downloadCSV();window.scrollTo(0,0);
+}
 $('begin').addEventListener('click',()=>{if(!audioReady)return;const id=$('participant').value.trim(),blockId=Number($('blockId').value),number=$('sequenceNo').value;if(!id){$('participant').reportValidity();return}if(!Number.isSafeInteger(blockId)||blockId<1){$('blockId').reportValidity();return}if(number&&(!Number.isInteger(Number(number))||Number(number)<1||Number(number)>10)){$('sequenceNo').reportValidity();return}participant=id;step=0;rows=[];$('setup').classList.add('hidden');$('consent').classList.remove('hidden');window.scrollTo(0,0)});
 $('consentContinue').addEventListener('click',()=>{if(!$('consentAge').checked||!$('consentAgree').checked){$('consentError').textContent='You must be 18 or older and agree to participate before continuing.';$('consentError').classList.remove('hidden');return}consentTimestamp=new Date().toISOString();$('consentError').classList.add('hidden');$('consent').classList.add('hidden');$('eligibility').classList.remove('hidden');window.scrollTo(0,0)});
 $('consentDecline').addEventListener('click',()=>{$('consent').classList.add('hidden');$('declined').classList.remove('hidden');window.scrollTo(0,0)});
