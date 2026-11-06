@@ -6,7 +6,7 @@
 <style>
 
 /* Same gallery design as the rest of the site: white wall, gray mats, black type. */
-:root{--bg:#fff;--surface:#ebebeb;--ink:#000;--ink2:#3a3a3a;--muted:#666;--line:#ccc;--accent:#000;--sans:'Libre Franklin','Franklin Gothic Medium','Franklin Gothic','Helvetica Neue',Helvetica,Arial,sans-serif;--edge:clamp(20px,5vw,64px)}
+:root{--bg:#d8d8d8;--surface:#bfbfbf;--ink:#000;--ink2:#3a3a3a;--muted:#666;--line:#ccc;--accent:#000;--sans:'Libre Franklin','Franklin Gothic Medium','Franklin Gothic','Helvetica Neue',Helvetica,Arial,sans-serif;--edge:clamp(20px,5vw,64px)}
 *{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;background:var(--bg);color:var(--ink2);font:17px/1.6 var(--sans);-webkit-font-smoothing:antialiased}
 a{color:var(--ink);text-decoration:underline;text-decoration-thickness:1px;text-underline-offset:4px}a:hover{text-decoration-thickness:2px}
 a:focus-visible,button:focus-visible,input:focus-visible+.mode-card{outline:2px solid var(--ink);outline-offset:3px}
@@ -214,6 +214,11 @@ body.block-running,body.block-running *{cursor:none!important}
 #preBlockTetrisControls{width:min(100%,360px)}
 #tetrisPane .tetris-controls{width:240px;min-width:0}
 @media(max-width:560px){#demographics .demographic-fields{grid-template-columns:1fr}#demographics label:has(#genderOther){max-width:100%}}
+
+
+/* Give every experiment screen the same darker gray panel background. */
+#instructions,#running{background:var(--surface);padding:clamp(20px,3vw,36px);margin-bottom:18px}
+#running>.card{background:transparent}
 </style>
 </head>
 <body>
