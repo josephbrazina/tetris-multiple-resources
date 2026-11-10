@@ -248,6 +248,13 @@ body:has(#setup:not(.hidden)) .wrap{height:calc(100dvh - 60px);padding-top:clamp
  #setup #begin{margin-top:6px;padding:7px 14px}
 }
 
+/* Bring the play area closer to the top during every Tetris practice and test block. */
+body.block-running .wrap{padding-top:12px}
+body.block-running #running{margin-top:0}
+body.block-running #running>.card{padding:8px 14px;margin-bottom:8px}
+body.block-running #tetrisPane{padding:12px 18px}
+body.block-running #tetrisPane h2{margin-bottom:3px}
+
 /* Keep Tetris practice and Tetris Solo instructions and boards within one viewport. */
 html:has(body.tetris-no-scroll-page),body.tetris-no-scroll-page{overflow:hidden}
 body.tetris-no-scroll-page{height:100dvh}
